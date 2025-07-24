@@ -20,10 +20,12 @@
 import { EChartsExtensionInstallRegisters, use } from '../../extension';
 import {install as installVisualMapContinuous} from './installVisualMapContinuous';
 import {install as installVisualMapPiecewise} from './installVisualMapPiecewise';
+import {install as installVisualMapScrollablePiecewise} from './installVisualMapScrollablePiecewise';
 
 export function install(registers: EChartsExtensionInstallRegisters) {
     use(installVisualMapContinuous);
     use(installVisualMapPiecewise);
+    use(installVisualMapScrollablePiecewise);
 
     // Do not install './dataZoomSelect',
     // since it only work for toolbox dataZoom.
