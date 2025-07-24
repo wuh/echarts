@@ -27,21 +27,26 @@ import type PiecewiseModel from './PiecewiseModel';
 import { TextAlign } from 'zrender/src/core/types';
 import { VisualMappingOption } from '../../visual/VisualMapping';
 import { createTextStyle } from '../../label/labelStyle';
+import GlobalModel from '../../model/Global';
+import ExtensionAPI from '../../core/ExtensionAPI';
 
 class PiecewiseVisualMapView extends VisualMapView {
 
-    static type = 'visualMap.piecewise' as const;
+    static type = 'visualMap.piecewise';
 
     type = PiecewiseVisualMapView.type;
 
     visualMapModel: PiecewiseModel;
 
-    protected doRender() {
+    protected doRender(
+        visualMapModel: PiecewiseModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: unknown) {
         const thisGroup = this.group;
 
         thisGroup.removeAll();
 
-        const visualMapModel = this.visualMapModel;
         const textGap = visualMapModel.get('textGap');
         const textStyleModel = visualMapModel.textStyleModel;
         const textFont = textStyleModel.getFont();
@@ -105,7 +110,7 @@ class PiecewiseVisualMapView extends VisualMapView {
         this.positionGroup(thisGroup);
     }
 
-    private _enableHoverLink(itemGroup: graphic.Group, pieceIndex: number) {
+    protected _enableHoverLink(itemGroup: graphic.Group, pieceIndex: number) {
         itemGroup
             .on('mouseover', () => onHoverLink('highlight'))
             .on('mouseout', () => onHoverLink('downplay'));
@@ -124,25 +129,25 @@ class PiecewiseVisualMapView extends VisualMapView {
         };
     }
 
-    private _getItemAlign(): helper.ItemAlign {
+    protected _getItemAlign(): 'left' | 'right' {
         const visualMapModel = this.visualMapModel;
         const modelOption = visualMapModel.option;
 
-        if (modelOption.orient === 'vertical') {
-            return helper.getItemAlign(
-                visualMapModel, this.api, visualMapModel.itemSize
-            );
-        }
-        else { // horizontal, most case left unless specifying right.
+        // if (modelOption.orient === 'vertical') {
+        //     return helper.getItemAlign(
+        //         visualMapModel, this.api, visualMapModel.itemSize
+        //     );
+        // }
+        // else { // horizontal, most case left unless specifying right.
             let align = modelOption.align;
             if (!align || align === 'auto') {
                 align = 'left';
             }
             return align;
-        }
+        // }
     }
 
-    private _renderEndsText(
+    protected _renderEndsText(
         group: graphic.Group,
         text: string,
         itemSize: number[],
@@ -173,7 +178,7 @@ class PiecewiseVisualMapView extends VisualMapView {
      * @private
      * @return {Object} {peiceList, endsText} The order is the same as screen pixel order.
      */
-    private _getViewData() {
+    protected _getViewData():any {
         const visualMapModel = this.visualMapModel;
 
         const viewPieceList = zrUtil.map(visualMapModel.getPieceList(), function (piece, index) {
@@ -197,7 +202,7 @@ class PiecewiseVisualMapView extends VisualMapView {
         return {viewPieceList: viewPieceList, endsText: endsText};
     }
 
-    private _createItemSymbol(
+    protected _createItemSymbol(
         group: graphic.Group,
         representValue: number,
         shapeParam: number[],
@@ -214,7 +219,7 @@ class PiecewiseVisualMapView extends VisualMapView {
         group.add(itemSymbol);
     }
 
-    private _onItemClick(
+    protected _onItemClick(
         piece: VisualMappingOption['pieceList'][number]
     ) {
         const visualMapModel = this.visualMapModel;

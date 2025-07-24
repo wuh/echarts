@@ -114,9 +114,9 @@ export interface PiecewiseVisualMapOption extends VisualMapOption {
     hoverLink?: boolean
 }
 
-class PiecewiseModel extends VisualMapModel<PiecewiseVisualMapOption> {
+class PiecewiseModel<Opts extends PiecewiseVisualMapOption = PiecewiseVisualMapOption> extends VisualMapModel<Opts> {
 
-    static type = 'visualMap.piecewise' as const;
+    static type = 'visualMap.piecewise';
     type = PiecewiseModel.type;
 
     /**
