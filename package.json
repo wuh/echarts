@@ -1,6 +1,6 @@
 {
-  "name": "echarts",
-  "version": "5.6.0",
+  "name": "succ-echarts",
+  "version": "5.6.2-rc3",
   "description": "Apache ECharts is a powerful, interactive charting and data visualization library for browser",
   "license": "Apache-2.0",
   "keywords": [
@@ -20,12 +20,12 @@
   "types": "index.d.ts",
   "homepage": "https://echarts.apache.org",
   "bugs": {
-    "url": "https://github.com/apache/echarts/issues",
-    "email": "dev@echarts.apache.org"
+    "url": "https://github.com/wuh/echarts/issues",
+    "email": "wuh@succsoft.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/apache/echarts.git"
+    "url": "git+https://github.com/wuh/echarts.git"
   },
   "sideEffects": [
     "index.js",
