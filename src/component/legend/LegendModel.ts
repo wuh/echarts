@@ -240,6 +240,11 @@ export interface LegendOption extends ComponentOption, LegendStyleOption,
     tooltip?: CommonTooltipOption<LegendTooltipFormatterParams>
 
     triggerEvent?: boolean
+
+    /**
+     * 是否参与与自动排版
+     */
+    autoLayout?: boolean
 }
 
 class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentModel<Ops> {
@@ -535,7 +540,8 @@ class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentMode
             show: false
         },
 
-        triggerEvent: false
+        triggerEvent: false,
+        autoLayout: false
     };
 }
 

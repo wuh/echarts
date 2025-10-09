@@ -1,0 +1,131 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="lib/simpleRequire.js"></script>
+        <script src="lib/config.js"></script>
+        <script src="lib/jquery.min.js"></script>
+        <script src="lib/facePrint.js"></script>
+        <script src="lib/testHelper.js"></script>
+        <link rel="stylesheet" href="lib/reset.css">
+        <style>
+            .chart { height: 320px; }
+            h2 { margin: 8px 0; font: 14px/20px sans-serif; color: #444; }
+            .sep { height: 8px; }
+        </style>
+    </head>
+    <body>
+        <h2>顶部两个图例，autoLayout: true（整体水平居中）</h2>
+        <div class="chart" id="case-top-2"></div>
+        <div class="sep"></div>
+
+        <h2>底部混排：图例 + visualMap，autoLayout: true（整体水平居中）</h2>
+        <div class="chart" id="case-bottom-mix"></div>
+        <div class="sep"></div>
+
+        <h2>左/右侧纵向图例，autoLayout: true</h2>
+        <div class="chart" id="case-lr-2"></div>
+        <div class="sep"></div>
+
+        <h2>顶部滚动图例参与自动排版</h2>
+        <div class="chart" id="case-scroll"></div>
+
+        <script>
+            function makeSeries(seriesCount, categoryCount) {
+                var series = [];
+                var legendData = [];
+                var xAxisData = [];
+                for (var j = 0; j < categoryCount; j++) { xAxisData.push('C' + j); }
+                for (var i = 0; i < seriesCount; i++) {
+                    var data = [];
+                    for (var j = 0; j < categoryCount; j++) { data.push(+(Math.random() * 10).toFixed(3)); }
+                    var seriesName = 'S' + i;
+                    series.push({ name: seriesName, type: 'line', data: data });
+                    legendData.push(seriesName);
+                }
+                return { series: series, legendData: legendData, xAxisData: xAxisData };
+            }
+        </script>
+
+        <script>
+            require(['echarts'], function (echarts) {
+                var info = makeSeries(6, 6);
+                var option = {
+                    legend: [
+                        { top: 8, left: 'center', autoLayout: true, data: info.legendData },
+                        { top: 32, left: 'center', autoLayout: true, data: info.legendData.slice(0,3) }
+                    ],
+                    xAxis: { data: info.xAxisData },
+                    yAxis: {},
+                    series: info.series
+                };
+                testHelper.create(echarts, 'case-top-2', { option: option, title: '顶部两个图例整体居中' });
+            });
+        </script>
+
+        <script>
+            require(['echarts'], function (echarts) {
+                var info = makeSeries(8, 5);
+                var option = {
+                    legend: { bottom: 8, left: 'center', autoLayout: true, type: 'scroll', data: info.legendData },
+                    visualMap: { bottom: 8, right: 10, autoLayout: true, orient: 'horizontal', min: 0, max: 10 },
+                    xAxis: { data: info.xAxisData },
+                    yAxis: {},
+                    series: info.series
+                };
+                testHelper.create(echarts, 'case-bottom-mix', { option: option, title: '底部图例与 visualMap 混排整体居中' });
+            });
+        </script>
+
+        <script>
+            require(['echarts'], function (echarts) {
+                var info = makeSeries(5, 6);
+                var option = {
+                    legend: [
+                        { left: 8, top: 'middle', orient: 'vertical', autoLayout: true, data: info.legendData.slice(0,4) },
+                        { right: 8, top: 'middle', orient: 'vertical', autoLayout: true, data: info.legendData.slice(4) }
+                    ],
+                    grid: { left: 160, right: 160 },
+                    xAxis: { data: info.xAxisData },
+                    yAxis: {},
+                    series: info.series
+                };
+                testHelper.create(echarts, 'case-lr-2', { option: option, title: '左右图例纵向堆叠' });
+            });
+        </script>
+
+        <script>
+            require(['echarts'], function (echarts) {
+                var info = makeSeries(30, 6);
+                var option = {
+                    legend: { type: 'scroll', top: 8, left: 'center', autoLayout: true, data: info.legendData },
+                    xAxis: { data: info.xAxisData },
+                    yAxis: {},
+                    series: info.series
+                };
+                testHelper.create(echarts, 'case-scroll', { option: option, title: '滚动图例参与自动排版' });
+            });
+        </script>
+    </body>
+    </html>
+
+

@@ -157,6 +157,11 @@ export interface VisualMapOption<T extends VisualOptionBase = VisualOptionBase> 
 
 
     categories?: unknown
+
+    /**
+     * 是否参与与自动排版
+     */
+    autoLayout?: boolean
 }
 
 export interface VisualMeta {
@@ -646,7 +651,10 @@ class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends Com
 
         textStyle: {
             color: tokens.color.secondary          // 值域文字颜色
-        }
+        },
+
+        // Opt-out by default to remain backward compatible
+        autoLayout: false
     };
 }
 
