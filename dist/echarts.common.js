@@ -808,6 +808,37 @@
         EPSILON: EPSILON
     });
 
+    /*! *****************************************************************************
+    Copyright (c) Microsoft Corporation.
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+    REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+    AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+    INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+    LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+    OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+    PERFORMANCE OF THIS SOFTWARE.
+    ***************************************************************************** */
+    /* global Reflect, Promise */
+
+    var extendStatics$1 = function(d, b) {
+        extendStatics$1 = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics$1(d, b);
+    };
+
+    function __extends$1(d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics$1(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    }
+
     function create(x, y) {
         if (x == null) {
             x = 0;
@@ -1320,6 +1351,10 @@
             srcCoords.push(x, y);
             oldCoordTheSame = oldCoordTheSame && oldSrcCoords && x === oldSrcCoords[ii] && y === oldSrcCoords[ii + 1];
             destCoords.push(markers[i].offsetLeft, markers[i].offsetTop);
+        }
+        if (!oldCoordTheSame) {
+            delete saved.invTrans;
+            delete saved.trans;
         }
         return (oldCoordTheSame && transformer)
             ? transformer
@@ -2117,7 +2152,7 @@
         stop(this.event);
     }
     var EmptyProxy = (function (_super) {
-        __extends(EmptyProxy, _super);
+        __extends$1(EmptyProxy, _super);
         function EmptyProxy() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.handler = null;
@@ -2140,7 +2175,7 @@
     ];
     var tmpRect = new BoundingRect(0, 0, 0, 0);
     var Handler = (function (_super) {
-        __extends(Handler, _super);
+        __extends$1(Handler, _super);
         function Handler(storage, painter, proxy, painterRoot, pointerSize) {
             var _this = _super.call(this) || this;
             _this._hovered = new HoveredResult(0, 0);
@@ -5122,7 +5157,7 @@
         return new Date().getTime();
     }
     var Animation = (function (_super) {
-        __extends(Animation, _super);
+        __extends$1(Animation, _super);
         function Animation(opts) {
             var _this = _super.call(this) || this;
             _this._running = false;
@@ -5513,7 +5548,7 @@
         return DOMHandlerScope;
     }());
     var HandlerDomProxy = (function (_super) {
-        __extends(HandlerDomProxy, _super);
+        __extends$1(HandlerDomProxy, _super);
         function HandlerDomProxy(dom, painterRoot) {
             var _this = _super.call(this) || this;
             _this.__pointerCapturing = false;
@@ -7073,7 +7108,7 @@
     }
 
     var Group = (function (_super) {
-        __extends(Group, _super);
+        __extends$1(Group, _super);
         function Group(opts) {
             var _this = _super.call(this) || this;
             _this.isGroup = true;
@@ -9719,7 +9754,7 @@
     var PRIMARY_STATES_KEYS$1 = ['z', 'z2', 'invisible'];
     var PRIMARY_STATES_KEYS_IN_HOVER_LAYER = ['invisible'];
     var Displayable = (function (_super) {
-        __extends(Displayable, _super);
+        __extends$1(Displayable, _super);
         function Displayable(props) {
             return _super.call(this, props) || this;
         }
@@ -11270,7 +11305,7 @@
         'culling', 'z', 'z2', 'zlevel', 'parent'
     ]);
     var Path = (function (_super) {
-        __extends(Path, _super);
+        __extends$1(Path, _super);
         function Path(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11597,7 +11632,7 @@
         };
         Path.extend = function (defaultProps) {
             var Sub = (function (_super) {
-                __extends(Sub, _super);
+                __extends$1(Sub, _super);
                 function Sub(opts) {
                     var _this = _super.call(this, opts) || this;
                     defaultProps.init && defaultProps.init.call(_this, opts);
@@ -11640,7 +11675,7 @@
         miterLimit: 2
     }, DEFAULT_PATH_STYLE);
     var TSpan = (function (_super) {
-        __extends(TSpan, _super);
+        __extends$1(TSpan, _super);
         function TSpan() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11694,7 +11729,7 @@
             && source.width && source.height);
     }
     var ZRImage = (function (_super) {
-        __extends(ZRImage, _super);
+        __extends$1(ZRImage, _super);
         function ZRImage() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11885,7 +11920,7 @@
     }());
     var subPixelOptimizeOutputShape = {};
     var Rect = (function (_super) {
-        __extends(Rect, _super);
+        __extends$1(Rect, _super);
         function Rect(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11954,7 +11989,7 @@
         }, DEFAULT_COMMON_ANIMATION_PROPS.style)
     };
     var ZRText = (function (_super) {
-        __extends(ZRText, _super);
+        __extends$1(ZRText, _super);
         function ZRText(opts) {
             var _this = _super.call(this) || this;
             _this.type = 'text';
@@ -13473,7 +13508,7 @@
         return path;
     }
     var SVGPath = (function (_super) {
-        __extends(SVGPath, _super);
+        __extends$1(SVGPath, _super);
         function SVGPath() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -13514,7 +13549,7 @@
     function extendFromString(str, defaultOpts) {
         var innerOpts = createPathOptions(str, defaultOpts);
         var Sub = (function (_super) {
-            __extends(Sub, _super);
+            __extends$1(Sub, _super);
             function Sub(opts) {
                 var _this = _super.call(this, opts) || this;
                 _this.applyTransform = innerOpts.applyTransform;
@@ -13555,7 +13590,7 @@
         return CircleShape;
     }());
     var Circle = (function (_super) {
-        __extends(Circle, _super);
+        __extends$1(Circle, _super);
         function Circle(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13580,7 +13615,7 @@
         return EllipseShape;
     }());
     var Ellipse = (function (_super) {
-        __extends(Ellipse, _super);
+        __extends$1(Ellipse, _super);
         function Ellipse(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13847,7 +13882,7 @@
         return SectorShape;
     }());
     var Sector = (function (_super) {
-        __extends(Sector, _super);
+        __extends$1(Sector, _super);
         function Sector(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13875,7 +13910,7 @@
         return RingShape;
     }());
     var Ring = (function (_super) {
-        __extends(Ring, _super);
+        __extends$1(Ring, _super);
         function Ring(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13992,7 +14027,7 @@
         return PolygonShape;
     }());
     var Polygon = (function (_super) {
-        __extends(Polygon, _super);
+        __extends$1(Polygon, _super);
         function Polygon(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14016,7 +14051,7 @@
         return PolylineShape;
     }());
     var Polyline = (function (_super) {
-        __extends(Polyline, _super);
+        __extends$1(Polyline, _super);
         function Polyline(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14048,7 +14083,7 @@
         return LineShape;
     }());
     var Line = (function (_super) {
-        __extends(Line, _super);
+        __extends$1(Line, _super);
         function Line(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14131,7 +14166,7 @@
         }
     }
     var BezierCurve = (function (_super) {
-        __extends(BezierCurve, _super);
+        __extends$1(BezierCurve, _super);
         function BezierCurve(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14206,7 +14241,7 @@
         return ArcShape;
     }());
     var Arc = (function (_super) {
-        __extends(Arc, _super);
+        __extends$1(Arc, _super);
         function Arc(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14236,7 +14271,7 @@
     Arc.prototype.type = 'arc';
 
     var CompoundPath = (function (_super) {
-        __extends(CompoundPath, _super);
+        __extends$1(CompoundPath, _super);
         function CompoundPath() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.type = 'compound';
@@ -14296,7 +14331,7 @@
     }());
 
     var LinearGradient = (function (_super) {
-        __extends(LinearGradient, _super);
+        __extends$1(LinearGradient, _super);
         function LinearGradient(x, y, x2, y2, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0 : x;
@@ -14311,7 +14346,7 @@
     }(Gradient));
 
     var RadialGradient = (function (_super) {
-        __extends(RadialGradient, _super);
+        __extends$1(RadialGradient, _super);
         function RadialGradient(x, y, r, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0.5 : x;
@@ -14460,7 +14495,7 @@
 
     var m = [];
     var IncrementalDisplayable = (function (_super) {
-        __extends(IncrementalDisplayable, _super);
+        __extends$1(IncrementalDisplayable, _super);
         function IncrementalDisplayable() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.notClear = true;
@@ -37531,7 +37566,7 @@
         return newDom;
     }
     var Layer = (function (_super) {
-        __extends(Layer, _super);
+        __extends$1(Layer, _super);
         function Layer(id, painter, dpr) {
             var _this = _super.call(this) || this;
             _this.motionBlur = false;
