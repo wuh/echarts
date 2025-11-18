@@ -24,6 +24,7 @@ import PieSeriesModel from './PieSeries';
 import { normalizeArcAngles } from 'zrender/src/core/PathProxy';
 import { makeInner } from '../../util/model';
 import { getCircleLayout } from '../../util/layout';
+import { applyMarginToCircularLayout } from '../../util/autoLayout';
 
 
 const PI2 = Math.PI * 2;
@@ -36,191 +37,210 @@ export default function pieLayout(
     api: ExtensionAPI
 ) {
     ecModel.eachSeriesByType(seriesType, function (seriesModel: PieSeriesModel) {
-        const data = seriesModel.getData();
-        const valueDim = data.mapDimension('value');
+        pieSingleLayout(seriesModel, api);
+    });
+}
 
-        const { cx, cy, r, r0, viewRect } = getCircleLayout(seriesModel, api);
+export function pieSingleLayout(seriesModel: PieSeriesModel, api: ExtensionAPI, margin?: number[]) {
+    const data = seriesModel.getData();
+    const valueDim = data.mapDimension('value');
 
-        let startAngle = -seriesModel.get('startAngle') * RADIAN;
-        let endAngle = seriesModel.get('endAngle');
-        const padAngle = seriesModel.get('padAngle') * RADIAN;
+    let { cx, cy, r } = getCircleLayout(seriesModel, api);
+    const { r0, viewRect } = getCircleLayout(seriesModel, api);
 
-        endAngle = endAngle === 'auto' ? startAngle - PI2 : -endAngle * RADIAN;
+    if (margin) {
+        // 使用公共函数将margin应用到圆形布局中
+        const adjusted = applyMarginToCircularLayout(
+            margin,
+            cx,
+            cy,
+            r,
+            r0  // pie 有内半径
+        );
+        cx = adjusted.cx;
+        cy = adjusted.cy;
+        r = adjusted.r;
+    }
 
-        const minAngle = seriesModel.get('minAngle') * RADIAN;
+    let startAngle = -seriesModel.get('startAngle') * RADIAN;
+    let endAngle = seriesModel.get('endAngle');
+    const padAngle = seriesModel.get('padAngle') * RADIAN;
 
-        const minAndPadAngle = minAngle + padAngle;
+    endAngle = endAngle === 'auto' ? startAngle - PI2 : -endAngle * RADIAN;
 
-        let validDataCount = 0;
-        data.each(valueDim, function (value: number) {
-            !isNaN(value) && validDataCount++;
-        });
+    const minAngle = seriesModel.get('minAngle') * RADIAN;
 
-        const sum = data.getSum(valueDim);
-        // Sum may be 0
-        let unitRadian = Math.PI / (sum || validDataCount) * 2;
+    const minAndPadAngle = minAngle + padAngle;
 
-        const clockwise = seriesModel.get('clockwise');
+    let validDataCount = 0;
+    data.each(valueDim, function (value: number) {
+        !isNaN(value) && validDataCount++;
+    });
 
-        const roseType = seriesModel.get('roseType');
-        const stillShowZeroSum = seriesModel.get('stillShowZeroSum');
+    const sum = data.getSum(valueDim);
+    // Sum may be 0
+    let unitRadian = Math.PI / (sum || validDataCount) * 2;
 
-        // [0...max]
-        const extent = data.getDataExtent(valueDim);
-        extent[0] = 0;
+    const clockwise = seriesModel.get('clockwise');
 
-        const dir = clockwise ? 1 : -1;
-        const angles = [startAngle, endAngle];
-        const halfPadAngle = dir * padAngle / 2;
-        normalizeArcAngles(angles, !clockwise);
+    const roseType = seriesModel.get('roseType');
+    const stillShowZeroSum = seriesModel.get('stillShowZeroSum');
 
-        [startAngle, endAngle] = angles;
+    // [0...max]
+    const extent = data.getDataExtent(valueDim);
+    extent[0] = 0;
 
-        const layoutData = getSeriesLayoutData(seriesModel);
-        layoutData.startAngle = startAngle;
-        layoutData.endAngle = endAngle;
-        layoutData.clockwise = clockwise;
-        layoutData.cx = cx;
-        layoutData.cy = cy;
-        layoutData.r = r;
-        layoutData.r0 = r0;
+    const dir = clockwise ? 1 : -1;
+    const angles = [startAngle, endAngle];
+    const halfPadAngle = dir * padAngle / 2;
+    normalizeArcAngles(angles, !clockwise);
 
-        const angleRange = Math.abs(endAngle - startAngle);
+    [startAngle, endAngle] = angles;
 
-        // In the case some sector angle is smaller than minAngle
-        let restAngle = angleRange;
-        let valueSumLargerThanMinAngle = 0;
+    const layoutData = getSeriesLayoutData(seriesModel);
+    layoutData.startAngle = startAngle;
+    layoutData.endAngle = endAngle;
+    layoutData.clockwise = clockwise;
+    layoutData.cx = cx;
+    layoutData.cy = cy;
+    layoutData.r = r;
+    layoutData.r0 = r0;
 
-        let currentAngle = startAngle;
+    const angleRange = Math.abs(endAngle - startAngle);
 
-        // Requird by `pieLabelLayout`.
-        data.setLayout({ viewRect, r });
+    // In the case some sector angle is smaller than minAngle
+    let restAngle = angleRange;
+    let valueSumLargerThanMinAngle = 0;
 
-        data.each(valueDim, function (value: number, idx: number) {
-            let angle;
-            if (isNaN(value)) {
-                data.setItemLayout(idx, {
-                    angle: NaN,
-                    startAngle: NaN,
-                    endAngle: NaN,
-                    clockwise: clockwise,
-                    cx: cx,
-                    cy: cy,
-                    r0: r0,
-                    r: roseType
-                        ? NaN
-                        : r
-                });
-                return;
-            }
+    let currentAngle = startAngle;
 
-            // FIXME 兼容 2.0 但是 roseType 是 area 的时候才是这样？
-            if (roseType !== 'area') {
-                angle = (sum === 0 && stillShowZeroSum)
-                    ? unitRadian : (value * unitRadian);
-            }
-            else {
-                angle = angleRange / validDataCount;
-            }
+    // Requird by `pieLabelLayout`.
+    data.setLayout({ viewRect, r });
 
-
-            if (angle < minAndPadAngle) {
-                angle = minAndPadAngle;
-                restAngle -= minAndPadAngle;
-            }
-            else {
-                valueSumLargerThanMinAngle += value;
-            }
-
-            const endAngle = currentAngle + dir * angle;
-
-            // calculate display angle
-            let actualStartAngle = 0;
-            let actualEndAngle = 0;
-
-            if (padAngle > angle) {
-                actualStartAngle = currentAngle + dir * angle / 2;
-                actualEndAngle = actualStartAngle;
-            }
-            else {
-                actualStartAngle = currentAngle + halfPadAngle;
-                actualEndAngle = endAngle - halfPadAngle;
-            }
-
+    data.each(valueDim, function (value: number, idx: number) {
+        let angle;
+        if (isNaN(value)) {
             data.setItemLayout(idx, {
-                angle: angle,
-                startAngle: actualStartAngle,
-                endAngle: actualEndAngle,
+                angle: NaN,
+                startAngle: NaN,
+                endAngle: NaN,
                 clockwise: clockwise,
                 cx: cx,
                 cy: cy,
                 r0: r0,
                 r: roseType
-                    ? linearMap(value, extent, [r0, r])
+                    ? NaN
                     : r
             });
+            return;
+        }
 
-            currentAngle = endAngle;
+        // FIXME 兼容 2.0 但是 roseType 是 area 的时候才是这样？
+        if (roseType !== 'area') {
+            angle = (sum === 0 && stillShowZeroSum)
+                ? unitRadian : (value * unitRadian);
+        }
+        else {
+            angle = angleRange / validDataCount;
+        }
+
+
+        if (angle < minAndPadAngle) {
+            angle = minAndPadAngle;
+            restAngle -= minAndPadAngle;
+        }
+        else {
+            valueSumLargerThanMinAngle += value;
+        }
+
+        const endAngle = currentAngle + dir * angle;
+
+        // calculate display angle
+        let actualStartAngle = 0;
+        let actualEndAngle = 0;
+
+        if (padAngle > angle) {
+            actualStartAngle = currentAngle + dir * angle / 2;
+            actualEndAngle = actualStartAngle;
+        }
+        else {
+            actualStartAngle = currentAngle + halfPadAngle;
+            actualEndAngle = endAngle - halfPadAngle;
+        }
+
+        data.setItemLayout(idx, {
+            angle: angle,
+            startAngle: actualStartAngle,
+            endAngle: actualEndAngle,
+            clockwise: clockwise,
+            cx: cx,
+            cy: cy,
+            r0: r0,
+            r: roseType
+                ? linearMap(value, extent, [r0, r])
+                : r
         });
 
-        // Some sector is constrained by minAngle and padAngle
-        // Rest sectors needs recalculate angle
-        if (restAngle < PI2 && validDataCount) {
-            // Average the angle if rest angle is not enough after all angles is
-            // Constrained by minAngle and padAngle
-            if (restAngle <= 1e-3) {
-                const angle = angleRange / validDataCount;
-                data.each(valueDim, function (value: number, idx: number) {
-                    if (!isNaN(value)) {
-                        const layout = data.getItemLayout(idx);
-                        layout.angle = angle;
-
-                        let actualStartAngle = 0;
-                        let actualEndAngle = 0;
-
-                        if (angle < padAngle) {
-                            actualStartAngle = startAngle + dir * (idx + 1 / 2) * angle;
-                            actualEndAngle = actualStartAngle;
-                        }
-                        else {
-                            actualStartAngle = startAngle + dir * idx * angle + halfPadAngle;
-                            actualEndAngle = startAngle + dir * (idx + 1) * angle - halfPadAngle;
-                        }
-
-                        layout.startAngle = actualStartAngle;
-                        layout.endAngle = actualEndAngle;
-                    }
-                });
-            }
-            else {
-                unitRadian = restAngle / valueSumLargerThanMinAngle;
-                currentAngle = startAngle;
-                data.each(valueDim, function (value: number, idx: number) {
-                    if (!isNaN(value)) {
-                        const layout = data.getItemLayout(idx);
-                        const angle = layout.angle === minAndPadAngle
-                            ? minAndPadAngle : value * unitRadian;
-
-                        let actualStartAngle = 0;
-                        let actualEndAngle = 0;
-
-                        if (angle < padAngle) {
-                            actualStartAngle = currentAngle + dir * angle / 2;
-                            actualEndAngle = actualStartAngle;
-                        }
-                        else {
-                            actualStartAngle = currentAngle + halfPadAngle;
-                            actualEndAngle = currentAngle + dir * angle - halfPadAngle;
-                        }
-
-                        layout.startAngle = actualStartAngle;
-                        layout.endAngle = actualEndAngle;
-                        currentAngle += dir * angle;
-                    }
-                });
-            }
-        }
+        currentAngle = endAngle;
     });
+
+    // Some sector is constrained by minAngle and padAngle
+    // Rest sectors needs recalculate angle
+    if (restAngle < PI2 && validDataCount) {
+        // Average the angle if rest angle is not enough after all angles is
+        // Constrained by minAngle and padAngle
+        if (restAngle <= 1e-3) {
+            const angle = angleRange / validDataCount;
+            data.each(valueDim, function (value: number, idx: number) {
+                if (!isNaN(value)) {
+                    const layout = data.getItemLayout(idx);
+                    layout.angle = angle;
+
+                    let actualStartAngle = 0;
+                    let actualEndAngle = 0;
+
+                    if (angle < padAngle) {
+                        actualStartAngle = startAngle + dir * (idx + 1 / 2) * angle;
+                        actualEndAngle = actualStartAngle;
+                    }
+                    else {
+                        actualStartAngle = startAngle + dir * idx * angle + halfPadAngle;
+                        actualEndAngle = startAngle + dir * (idx + 1) * angle - halfPadAngle;
+                    }
+
+                    layout.startAngle = actualStartAngle;
+                    layout.endAngle = actualEndAngle;
+                }
+            });
+        }
+        else {
+            unitRadian = restAngle / valueSumLargerThanMinAngle;
+            currentAngle = startAngle;
+            data.each(valueDim, function (value: number, idx: number) {
+                if (!isNaN(value)) {
+                    const layout = data.getItemLayout(idx);
+                    const angle = layout.angle === minAndPadAngle
+                        ? minAndPadAngle : value * unitRadian;
+
+                    let actualStartAngle = 0;
+                    let actualEndAngle = 0;
+
+                    if (angle < padAngle) {
+                        actualStartAngle = currentAngle + dir * angle / 2;
+                        actualEndAngle = actualStartAngle;
+                    }
+                    else {
+                        actualStartAngle = currentAngle + halfPadAngle;
+                        actualEndAngle = currentAngle + dir * angle - halfPadAngle;
+                    }
+
+                    layout.startAngle = actualStartAngle;
+                    layout.endAngle = actualEndAngle;
+                    currentAngle += dir * angle;
+                }
+            });
+        }
+    }
 }
 
 export const getSeriesLayoutData = makeInner<{

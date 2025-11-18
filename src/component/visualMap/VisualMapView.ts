@@ -26,12 +26,13 @@ import ComponentView from '../../view/Component';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
 import VisualMapModel from './VisualMapModel';
-import { VisualOptionUnit, ColorString } from '../../util/types';
+import { VisualOptionUnit, ColorString, ZRRectLike } from '../../util/types';
 import { graphic } from '../../echarts.all';
+import { AutoLayoutComponentView } from '../../util/autoLayout';
 
 type VisualState = VisualMapModel['stateList'][number];
 
-class VisualMapView extends ComponentView {
+class VisualMapView extends ComponentView implements AutoLayoutComponentView {
     static type = 'visualMap';
     type = VisualMapView.type;
 
@@ -68,6 +69,16 @@ class VisualMapView extends ComponentView {
 
         this.doRender(visualMapModel, ecModel, api, payload);
     }
+
+    /**
+     * @override
+     * 子类必须覆盖此方法以实现尺寸估算
+     */
+    renderForEstimate(visualMapModel: VisualMapModel, ecModel: GlobalModel, api: ExtensionAPI): ZRRectLike {
+        // 子类必须覆盖此方法
+        return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
 
     /**
      * @protected

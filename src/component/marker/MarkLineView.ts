@@ -32,6 +32,9 @@ import ExtensionAPI from '../../core/ExtensionAPI';
 import Cartesian2D from '../../coord/cartesian/Cartesian2D';
 import GlobalModel from '../../model/Global';
 import MarkerModel from './MarkerModel';
+import { BoundingRect } from 'zrender';
+import { getLabelStatesModels } from '../../label/labelStyle';
+import { calculateLabelBoundingRectFromPosition } from '../../util/autoLayout';
 import {
     isArray,
     retrieve,
@@ -266,6 +269,154 @@ class MarkLineView extends MarkerView {
     type = MarkLineView.type;
 
     markerGroupMap: HashMap<LineDraw>;
+
+    /**
+     * 获取标签的边界矩形。
+     *
+     * 这个方法的主要目的是为标记线（markLine）的标签计算出它们在图表中的边界矩
+     * 形区域，用于处理标签溢出的情况。
+     *
+     * @param seriesModel 系列模型，包含系列的坐标系、数据等信息。
+     * @param mlModel 标记线模型，包含标记线的配置和数据。
+     * @param api 扩展API。
+     * @returns 包含所有标签边界矩形和文本对齐信息的数组。
+     */
+    getLabelBoundingRect(
+        seriesModel: SeriesModel,
+        mlModel: MarkLineModel,
+        api: ExtensionAPI
+    ): Array<{ rect: BoundingRect; textAlign: string }> {
+        // 初始化结果数组，用于存储所有标签的边界信息
+        const result: Array<{ rect: BoundingRect; textAlign: string }> = [];
+
+        // 获取系列的坐标系，如果没有坐标系则直接返回空数组
+        const coordSys = seriesModel.coordinateSystem;
+        if (!coordSys) {
+            return result;
+        }
+
+        // 创建标记线的数据列表结构，包含起始点数据、结束点数据和线段数据
+        const mlData = createList(coordSys, seriesModel, mlModel);
+        const lineData = mlData.line;    // 线段数据，用于获取标签配置
+        const fromData = mlData.from;    // 起始点数据
+        const toData = mlData.to;        // 结束点数据
+
+        // 临时将线段数据设置到模型中，这样getFormattedLabel方法才能正确工作
+        // 保存原始数据以便后续恢复
+        const originalData = mlModel.getData();
+        mlModel.setData(lineData);
+
+        // 计算起始点和结束点的布局信息，这是标签位置计算的前提
+        // isFrom参数为true表示起始点，false表示结束点
+        fromData.each(function (idx) {
+            updateSingleMarkerEndLayout(fromData, idx, true, seriesModel, api);
+        });
+        toData.each(function (idx) {
+            updateSingleMarkerEndLayout(toData, idx, false, seriesModel, api);
+        });
+
+        // 获取标记线模型的全局标签状态模型，类似于LineDraw中的makeSeriesScope逻辑
+        const globalLabelStatesModels = getLabelStatesModels(mlModel);
+        const globalLabelModel = globalLabelStatesModels.normal;  // 获取普通状态下的标签配置
+
+        // 遍历每一根标记线，计算其标签的边界矩形
+        lineData.each(function (idx: number) {
+            // 获取当前数据项的模型，优先使用数据项级别的配置，其次使用全局配置
+            const itemModel = lineData.getItemModel(idx);
+            let labelModel = globalLabelModel;
+
+            // 检查数据项是否有自己的标签配置
+            if (lineData.hasItemOption) {
+                const itemLabelStatesModels = getLabelStatesModels(itemModel);
+                const itemLabelModel = itemLabelStatesModels.normal;
+                // 如果数据项级别的标签配置中明确指定了show属性，则使用数据项级别的配置
+                if (itemLabelModel.get('show') !== undefined) {
+                    labelModel = itemLabelModel;
+                }
+            }
+
+            // 检查标签是否应该显示，如果配置为不显示则跳过当前标记线
+            if (!labelModel.get('show')) {
+                return;
+            }
+
+            // 获取标签的位置配置，支持 'start'（起始点）、'middle'（中间点）、'end'（结束点）
+            const position = labelModel.get('position') as string || 'end';
+            let point: number[];  // 标签基准点的坐标
+            let labelX: number;   // 标签的X坐标
+            let labelY: number;   // 标签的Y坐标
+
+            // 根据位置配置确定标签的基准点坐标
+            if (position === 'start') {
+                // 标签显示在起始点
+                point = fromData.getItemLayout(idx);
+                labelX = point[0];
+                labelY = point[1];
+            }
+            else if (position === 'middle') {
+                // 标签显示在线段中间点
+                const fromPoint = fromData.getItemLayout(idx);
+                const toPoint = toData.getItemLayout(idx);
+                // 确保起始点和结束点的布局信息都存在且有效
+                if (fromPoint && toPoint && fromPoint.length >= 2 && toPoint.length >= 2) {
+                    // 计算线段的中点坐标
+                    point = [
+                        (fromPoint[0] + toPoint[0]) / 2,
+                        (fromPoint[1] + toPoint[1]) / 2
+                    ];
+                    labelX = point[0];
+                    labelY = point[1];
+                }
+                else {
+                    // 如果无法计算中点，直接跳过当前标记线
+                    return;
+                }
+            }
+            else {
+                // 默认情况：标签显示在结束点
+                point = toData.getItemLayout(idx);
+                labelX = point[0];
+                labelY = point[1];
+            }
+
+            // 确保坐标点有效，否则跳过当前标记线
+            if (!point || point.length < 2) {
+                return;
+            }
+
+            // 获取格式化后的标签文本内容
+            const labelText = mlModel.getFormattedLabel(idx, 'normal');
+            // 如果没有文本内容或文本为空，则跳过当前标记线
+            if (labelText == null || labelText === '') {
+                return;
+            }
+
+            // 将点坐标转换为0x0尺寸的矩形，中心位于该点，用于后续的标签位置计算
+            // 这个矩形作为参考矩形来计算标签的实际位置
+            const pointRect = new BoundingRect(labelX, labelY, 0, 0);
+
+
+            // 使用统一的标签边界计算函数计算标签的实际边界矩形
+            // 这个函数会根据position和distance配置自动计算标签的偏移位置
+            const labelRect = calculateLabelBoundingRectFromPosition(
+                position,                              // 标签位置类型
+                pointRect,                             // 参考矩形
+                labelModel,                            // 标签模型（用于获取字体信息和距离）
+                labelText                              // 标签文本内容
+            );
+
+            // 如果成功计算出标签边界，则添加到结果数组中
+            if (labelRect) {
+                result.push(labelRect);
+            }
+        });
+
+        // 恢复模型的原始数据设置
+        mlModel.setData(originalData);
+
+        // 返回所有标签的边界矩形信息
+        return result;
+    }
 
     updateTransform(markLineModel: MarkLineModel, ecModel: GlobalModel, api: ExtensionAPI) {
         ecModel.eachSeries(function (seriesModel) {

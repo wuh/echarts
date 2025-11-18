@@ -54,12 +54,13 @@ import { createOrUpdatePatternFromDecal } from '../../util/decal';
 import { getECData } from '../../util/innerStore';
 import tokens from '../../visual/tokens';
 import Element from 'zrender/src/Element';
+import { AutoLayoutComponentView, applyPaddingToRect } from '../../util/autoLayout';
 
 const curry = zrUtil.curry;
 const each = zrUtil.each;
 const Group = graphic.Group;
 
-class LegendView extends ComponentView {
+class LegendView extends ComponentView implements AutoLayoutComponentView {
     static type = 'legend.plain';
     type = LegendView.type;
 
@@ -116,21 +117,10 @@ class LegendView extends ComponentView {
             return;
         }
 
-        let itemAlign = legendModel.get('align');
         const orient = legendModel.get('orient');
-        if (!itemAlign || itemAlign === 'auto') {
-            itemAlign = (
-                legendModel.get('left') === 'right'
-                && orient === 'vertical'
-            ) ? 'right' : 'left';
-        }
-
-        // selector has been normalized to an array in model
+        const itemAlign = this.calculateItemAlign(legendModel, orient);
         const selector = legendModel.get('selector', true) as LegendSelectorButtonOption[];
-        let selectorPosition = legendModel.get('selectorPosition', true);
-        if (selector && (!selectorPosition || selectorPosition === 'auto')) {
-            selectorPosition = orient === 'horizontal' ? 'end' : 'start';
-        }
+        const selectorPosition = this.calculateSelectorPosition(legendModel, orient, selector);
 
         this.renderInner(itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition);
 
@@ -166,10 +156,350 @@ class LegendView extends ComponentView {
         );
     }
 
+    /** @implements AutoLayoutComponentView */
+    renderForEstimate(legendModel: LegendModel, ecModel: GlobalModel, api: ExtensionAPI): ZRRectLike {
+        if (!legendModel.get('show', true)) {
+            return { x: 0, y: 0, width: 0, height: 0 };
+        }
+
+        // 清空现有内容，为估算做准备
+        this.resetInner();
+
+        const orient = legendModel.get('orient');
+        const itemAlign = this.calculateItemAlign(legendModel, orient);
+        const selector = legendModel.get('selector', true) as LegendSelectorButtonOption[];
+        const selectorPosition = this.calculateSelectorPosition(legendModel, orient, selector);
+
+        // 使用估算模式的内部渲染：创建透明元素用于布局计算
+        this.renderInnerForEstimate(itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition);
+
+        // 使用估算模式的布局计算
+        const layoutRect = this.layoutInnerForEstimate(legendModel, itemAlign, selector, selectorPosition, api);
+
+        // 估算背景尺寸
+        return applyPaddingToRect(layoutRect, legendModel);
+    }
+
+    /**
+     * 估算模式的内部渲染：创建透明元素用于布局计算
+     * @protected
+     */
+    protected renderInnerForEstimate(
+        itemAlign: LegendOption['align'],
+        legendModel: LegendModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        selector: LegendSelectorButtonOption[],
+        orient: LegendOption['orient'],
+        selectorPosition: LegendOption['selectorPosition']
+    ) {
+        const contentGroup = this.getContentGroup();
+        const legendDrawnMap = zrUtil.createHashMap();
+
+        each(legendModel.getData(), function (legendItemModel, dataIndex) {
+            const name = legendItemModel.get('name');
+
+            // Use empty string or \n as a newline string
+            if (!this.newlineDisabled && (name === '' || name === '\n')) {
+                const g = new Group();
+                contentGroup.add(g);
+                return;
+            }
+
+            if (legendDrawnMap.get(name)) {
+                return;
+            }
+
+            const seriesModel = ecModel.getSeriesByName(name)[0] as SeriesModel<SeriesOption & SymbolOptionMixin>;
+
+            if (seriesModel) {
+                // 创建透明的图例项用于尺寸估算
+                const itemGroup = this.createTransparentLegendItem(
+                    seriesModel, name, dataIndex, legendItemModel, legendModel, itemAlign
+                );
+                contentGroup.add(itemGroup);
+                legendDrawnMap.set(name, true);
+            }
+            else {
+                // Legend to control data. In pie and funnel.
+                ecModel.eachRawSeries(function (seriesModel) {
+                    // In case multiple series has same data name
+                    if (legendDrawnMap.get(name)) {
+                        return;
+                    }
+
+                    if (seriesModel.legendVisualProvider) {
+                        const provider = seriesModel.legendVisualProvider;
+                        if (!provider.containName(name)) {
+                            return;
+                        }
+
+                        const idx = provider.indexOfName(name);
+
+                        const legendIcon = provider.getItemVisual(idx, 'legendIcon');
+
+                        const itemGroup = this.createTransparentLegendItemForProvider(
+                            seriesModel, name, dataIndex, legendItemModel, legendModel, itemAlign,
+                            legendIcon
+                        );
+                        contentGroup.add(itemGroup);
+                        legendDrawnMap.set(name, true);
+                    }
+                }, this);
+            }
+        }, this);
+
+        if (selector) {
+            this.createTransparentSelector(selector, legendModel, orient, selectorPosition);
+        }
+    }
+
+    /**
+     * 创建透明的图例项用于尺寸估算
+     * @protected
+     */
+    protected createTransparentLegendItem(
+        seriesModel: SeriesModel<SeriesOption & SymbolOptionMixin>,
+        name: string,
+        dataIndex: number,
+        legendItemModel: LegendModel['_data'][number],
+        legendModel: LegendModel,
+        itemAlign: LegendOption['align']
+    ): graphic.Group {
+        const itemWidth = legendModel.get('itemWidth');
+        const itemHeight = legendModel.get('itemHeight');
+
+        const itemGroup = new graphic.Group();
+
+        // 创建透明的文本元素用于尺寸计算
+        const textStyleModel = legendItemModel.getModel('textStyle');
+        const textColor = legendModel.isSelected(name)
+            ? textStyleModel.getTextColor()
+            : legendItemModel.get('inactiveColor');
+
+        // 创建文本但设置为透明
+        const text = new graphic.Text({
+            style: createTextStyle(textStyleModel, {
+                text: name,
+                x: itemAlign === 'left' ? itemWidth + 5 : -5,
+                y: itemHeight / 2,
+                fill: 'transparent', // 设置为透明
+                align: itemAlign as ZRTextAlign,
+                verticalAlign: 'middle'
+            }, {inheritColor: textColor})
+        });
+        itemGroup.add(text);
+
+        // 创建透明的图标
+        const icon = createSymbol(
+            legendItemModel.get('icon') || 'roundRect',
+            itemAlign === 'left' ? 0 : -itemWidth,
+            0,
+            itemWidth,
+            itemHeight,
+            'transparent' // 设置为透明
+        );
+        itemGroup.add(icon);
+
+        return itemGroup;
+    }
+
+    protected createTransparentLegendItemForProvider(
+        seriesModel: SeriesModel<SeriesOption & SymbolOptionMixin>,
+        name: string,
+        dataIndex: number,
+        legendItemModel: LegendModel['_data'][number],
+        legendModel: LegendModel,
+        itemAlign: LegendOption['align'],
+        legendIcon?: string
+    ): graphic.Group {
+        const itemWidth = legendModel.get('itemWidth');
+        const itemHeight = legendModel.get('itemHeight');
+
+        const itemGroup = new graphic.Group();
+
+        // 创建透明的文本元素用于尺寸计算
+        const textStyleModel = legendItemModel.getModel('textStyle');
+        const textColor = legendModel.isSelected(name)
+            ? textStyleModel.getTextColor()
+            : legendItemModel.get('inactiveColor');
+
+        // 创建文本但设置为透明
+        const text = new graphic.Text({
+            style: createTextStyle(textStyleModel, {
+                text: name,
+                x: itemAlign === 'left' ? itemWidth + 5 : -5,
+                y: itemHeight / 2,
+                fill: 'transparent', // 设置为透明
+                align: itemAlign as ZRTextAlign,
+                verticalAlign: 'middle'
+            }, {inheritColor: textColor})
+        });
+        itemGroup.add(text);
+
+        // 创建透明的图标，使用legendIcon或默认图标
+        const iconType = legendIcon || legendItemModel.get('icon') || 'roundRect';
+        const icon = createSymbol(
+            iconType,
+            itemAlign === 'left' ? 0 : -itemWidth,
+            0,
+            itemWidth,
+            itemHeight,
+            'transparent' // 设置为透明
+        );
+        itemGroup.add(icon);
+
+        return itemGroup;
+    }
+
+    /**
+     * 创建透明的选择器用于尺寸估算
+     * @protected
+     */
+    protected createTransparentSelector(
+        selector: LegendSelectorButtonOption[],
+        legendModel: LegendModel,
+        orient: LegendOption['orient'],
+        selectorPosition: LegendOption['selectorPosition']
+    ) {
+        const selectorGroup = this.getSelectorGroup();
+
+        each(selector, function (selectorItem) {
+            const labelText = new graphic.Text({
+                style: {
+                    x: 0,
+                    y: 0,
+                    align: 'center',
+                    verticalAlign: 'middle',
+                    fill: 'transparent' // 设置为透明
+                }
+            });
+
+            selectorGroup.add(labelText);
+
+            const labelModel = legendModel.getModel('selectorLabel');
+            setLabelStyle(
+                labelText, { normal: labelModel, emphasis: labelModel },
+                {
+                    defaultText: (selectorItem as any).title || selectorItem
+                }
+            );
+        });
+    }
+
+    /**
+     * 估算模式的布局计算
+     * @protected
+     */
+    protected layoutInnerForEstimate(
+        legendModel: LegendModel,
+        itemAlign: LegendOption['align'],
+        selector: LegendOption['selector'],
+        selectorPosition: LegendOption['selectorPosition'],
+        api: ExtensionAPI
+    ): ZRRectLike {
+        const contentGroup = this.getContentGroup();
+        const selectorGroup = this.getSelectorGroup();
+
+        // 获取容器的可用空间
+        const refContainer = layoutUtil.createBoxLayoutReference(legendModel, api).refContainer;
+        const positionInfo = legendModel.getBoxLayoutParams();
+        const padding = legendModel.get('padding');
+        const maxSize = layoutUtil.getLayoutRect(positionInfo, refContainer, padding);
+
+        // 使用容器的实际尺寸进行布局
+        layoutUtil.box(
+            legendModel.get('orient'),
+            contentGroup,
+            legendModel.get('itemGap'),
+            maxSize.width,
+            maxSize.height
+        );
+
+        const contentRect = contentGroup.getBoundingRect();
+
+        if (selector) {
+            // 对选择器进行布局
+            layoutUtil.box(
+                'horizontal',
+                selectorGroup,
+                legendModel.get('selectorItemGap', true)
+            );
+
+            const selectorRect = selectorGroup.getBoundingRect();
+
+            return this.calculateLayoutRect(legendModel, contentRect, selectorRect, selectorPosition);
+        }
+
+        return contentRect;
+    }
+
+
     protected resetInner() {
         this.getContentGroup().removeAll();
         this._backgroundEl && this.group.remove(this._backgroundEl);
         this.getSelectorGroup().removeAll();
+    }
+
+    /**
+     * 计算图例项的对齐方式
+     * @protected
+     */
+    protected calculateItemAlign(legendModel: LegendModel, orient: LegendOption['orient']): LegendOption['align'] {
+        let itemAlign = legendModel.get('align');
+        if (!itemAlign || itemAlign === 'auto') {
+            itemAlign = (
+                legendModel.get('left') === 'right'
+                && orient === 'vertical'
+            ) ? 'right' : 'left';
+        }
+        return itemAlign;
+    }
+
+    /**
+     * 计算选择器位置
+     * @protected
+     */
+    protected calculateSelectorPosition(
+        legendModel: LegendModel,
+        orient: LegendOption['orient'],
+        selector: LegendSelectorButtonOption[]
+    ): LegendOption['selectorPosition'] {
+        let selectorPosition = legendModel.get('selectorPosition', true);
+        if (selector && (!selectorPosition || selectorPosition === 'auto')) {
+            selectorPosition = orient === 'horizontal' ? 'end' : 'start';
+        }
+        return selectorPosition;
+    }
+
+    /**
+     * 计算布局矩形
+     * @protected
+     */
+    protected calculateLayoutRect(
+        legendModel: LegendModel,
+        contentRect: ZRRectLike,
+        selectorRect?: ZRRectLike,
+        selectorPosition?: LegendOption['selectorPosition'],
+        selectorPos?: number[]
+    ): ZRRectLike {
+        const selectorButtonGap = legendModel.get('selectorButtonGap', true);
+        const orientIdx = legendModel.getOrient().index;
+        const wh: 'width' | 'height' = orientIdx === 0 ? 'width' : 'height';
+        const hw: 'width' | 'height' = orientIdx === 0 ? 'height' : 'width';
+        const yx: 'x' | 'y' = orientIdx === 0 ? 'y' : 'x';
+
+        if (selectorRect && selectorPosition) {
+            const mainRect = {x: 0, y: 0} as ZRRectLike;
+            mainRect[wh] = contentRect[wh] + selectorButtonGap + selectorRect[wh];
+            mainRect[hw] = Math.max(contentRect[hw], selectorRect[hw]);
+            mainRect[yx] = selectorPos
+                ? Math.min(0, selectorRect[yx] + selectorPos[1 - orientIdx])
+                : Math.min(0, selectorRect[yx]);
+            return mainRect;
+        }
+
+        return contentRect;
     }
 
     protected renderInner(
@@ -558,7 +888,6 @@ class LegendView extends ComponentView {
             const orientIdx = legendModel.getOrient().index;
             const wh: 'width' | 'height' = orientIdx === 0 ? 'width' : 'height';
             const hw: 'width' | 'height' = orientIdx === 0 ? 'height' : 'width';
-            const yx: 'x' | 'y' = orientIdx === 0 ? 'y' : 'x';
 
             if (selectorPosition === 'end') {
                 selectorPos[orientIdx] += contentRect[wh] + selectorButtonGap;
@@ -574,11 +903,7 @@ class LegendView extends ComponentView {
             contentGroup.x = contentPos[0];
             contentGroup.y = contentPos[1];
 
-            const mainRect = {x: 0, y: 0} as ZRRectLike;
-            mainRect[wh] = contentRect[wh] + selectorButtonGap + selectorRect[wh];
-            mainRect[hw] = Math.max(contentRect[hw], selectorRect[hw]);
-            mainRect[yx] = Math.min(0, selectorRect[yx] + selectorPos[1 - orientIdx]);
-            return mainRect;
+            return this.calculateLayoutRect(legendModel, contentRect, selectorRect, selectorPosition, selectorPos);
         }
         else {
             contentGroup.x = contentPos[0];

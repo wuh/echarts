@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<!--
+  系列标签自动挤压内容区域测试页
+  - 场景覆盖: 标签显示/隐藏、标签位置、标签旋转、标签距离、高密度数据、垂直/水平条形图（+图例自动布局开关）、极坐标系（撑满画布+12个数据点+标签位置start/inside/middle/end+距离+自动压缩）、雷达图（5个维度+标签位置top/inside/bottom+距离+自动压缩+布局位置+图例自动布局开关）、单轴坐标系（8个数据点+标签位置top/middle/bottom/left/right+距离+自动压缩+布局位置+图例自动布局开关）、日历坐标系（10个日期数据点+标签位置top/middle/bottom/left/right+距离+自动压缩+布局位置+图例自动布局开关）、矩阵坐标系（4x4产品季度数据+标签位置top/middle/bottom/left/right+距离+自动压缩+图例自动布局开关）、参考线标签溢出测试（柱状图+多类型参考线标签位置测试+距离+自动压缩+布局位置）、参考点标签溢出测试（散点图+线图+多类型参考点标签位置测试+距离+自动压缩+布局位置）
+  - 交互控件：标签显示开关、标签位置、标签旋转角度、数据密度、标签距离、标签自动压缩、布局位置
+-->
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="lib/simpleRequire.js"></script>
+  <script src="lib/config.js"></script>
+  <script src="lib/jquery.min.js"></script>
+  <script src="lib/testHelper.js"></script>
+  <link rel="stylesheet" href="lib/reset.css" />
+  <style>
+    h2 {
+      margin: 12px 0 4px;
+      font-size: 14px;
+    }
+
+    .test-chart-block {
+      border-bottom: 1px solid black;
+    }
+
+    /* 防止横向滚动条 */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* 确保图表容器不会超出页面宽度 */
+    .test-chart-block {
+      width: 100%;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="series-label-auto-compress-basic"></div>
+  <div id="series-label-auto-compress-horizontal"></div>
+  <div id="series-label-auto-compress-radar"></div>
+  <div id="series-label-auto-compress-single"></div>
+  <div id="series-label-auto-compress-calendar"></div>
+  <div id="series-label-auto-compress-matrix"></div>
+  <div id="series-label-auto-compress-markline"></div>
+  <div id="series-label-auto-compress-markpoint"></div>
+
+  <script>
+    require(['echarts'], function (echarts) {
+
+      // 标签位置常量定义
+      var LABEL_POSITIONS = ['top', 'right', 'inside'];
+      var LABEL_POSITION_OPTIONS = [
+        { text: '顶部', value: 'top' },
+        { text: '右侧', value: 'right' },
+        { text: '内部', value: 'inside' }
+      ];
+
+      // 固定数据，确保某些柱子撑满图形
+      var FIXED_DATA = [
+        15, 35, 85, 25, 99, 45, 75, 55, 95, 20,
+        40, 80, 30, 70, 88, 18, 92, 38, 78, 58,
+        12, 95, 42, 88, 28, 68, 98, 22, 82, 52,
+        32, 72, 96, 16, 86, 36, 76, 56, 91, 26,
+        46, 81, 31, 71, 89, 19, 93, 39, 79, 59,
+        13, 94, 43, 87, 29, 69, 97, 23, 83, 53,
+        33, 73, 95, 17, 87, 37, 77, 57, 92, 27,
+        47, 82, 34, 74, 90, 24, 84, 44, 84, 54,
+        14, 96, 41, 86, 21, 91, 51, 81, 61, 11,
+        99, 49, 89, 29, 79, 39, 69, 19, 59, 9
+      ];
+
+      // 辅助函数：从控件状态中获取实际值
+      function getValueFromControlState(controlState, controlDefine) {
+        if (!controlState || typeof controlState.optionIndex !== 'number') {
+          return controlDefine.value; // 返回默认值
+        }
+        var optionIndex = controlState.optionIndex;
+        if (controlDefine.values) {
+          return controlDefine.values[optionIndex];
+        } else if (controlDefine.options) {
+          return controlDefine.options[optionIndex].value;
+        }
+        return controlDefine.value; // 返回默认值
+      }
+
+      // 辅助函数：获取控件定义
+      function getControlDefinition(paramName) {
+        var controlDefinitions = {
+          'showLabel': {
+            values: [false, true],
+            value: true
+          },
+          'labelPosition': {
+            values: LABEL_POSITIONS,
+            value: 'top'
+          },
+          'labelRotate': {
+            values: [0, 45, 90, -45, -90],
+            value: 0
+          },
+          'dataDensity': {
+            values: [6, 12, 24, 48],
+            value: 12
+          },
+          'adaptiveLayout': {
+            values: [false, true],
+            value: true
+          },
+          'layoutPosition': {
+            values: ['bottom', 'top', 'left', 'right'],
+            value: 'bottom'
+          },
+          'polarLabelPosition': {
+            values: ['start', 'inside', 'middle', 'end'],
+            value: 'end'
+          },
+          'radarLabelPosition': {
+            values: ['top', 'inside', 'bottom'],
+            value: 'bottom'
+          },
+          'radarLayoutPosition': {
+            values: ['bottom', 'top', 'left', 'right'],
+            value: 'bottom'
+          },
+          'enableAutoLayout': {
+            values: [false, true],
+            value: true
+          },
+          'singleLabelPosition': {
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            value: 'top'
+          },
+          'singleLayoutPosition': {
+            values: ['bottom', 'top', 'left', 'right'],
+            value: 'bottom'
+          },
+          'calendarLabelPosition': {
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            value: 'top'
+          },
+          'calendarLayoutPosition': {
+            values: ['bottom', 'top', 'left', 'right'],
+            value: 'bottom'
+          },
+          'enableCalendarLegendAutoLayout': {
+            values: [false, true],
+            value: true
+          },
+          'enableMatrixLegendAutoLayout': {
+            values: [false, true],
+            value: false
+          },
+          'matrixLayoutPosition': {
+            values: ['bottom', 'top', 'left', 'right'],
+            value: 'bottom'
+          },
+          'matrixLabelPosition': {
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            value: 'top'
+          },
+          'markLineLabelPosition': {
+            values: ['start', 'middle', 'end'],
+            value: 'end'
+          },
+          'markPointLabelPosition': {
+            values: ['top', 'bottom', 'left', 'right', 'inside', 'insideTop', 'insideLeft', 'insideRight', 'insideBottom'],
+            value: 'top'
+          },
+          'markPointSymbol': {
+            values: ['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow'],
+            value: 'pin'
+          }
+        };
+        return controlDefinitions[paramName] || null;
+      }
+
+      // 通用onchange处理函数
+      function handleOptionChange(chart, optionGenerator, paramNames) {
+        var state = chart.__testHelper.getInputsState();
+        var params = [];
+
+        // 处理参数映射
+        for (var i = 0; i < paramNames.length; i++) {
+          var paramName = paramNames[i];
+          var controlState = state[paramName];
+
+          if (controlState && controlState.value !== undefined) {
+            // range控件：直接使用value
+            params.push(controlState.value);
+          } else if (controlState && controlState.optionIndex !== undefined) {
+            // select控件：使用optionIndex获取值
+            var controlDef = getControlDefinition(paramName);
+            if (controlDef) {
+              params.push(getValueFromControlState(controlState, controlDef));
+            }
+            else {
+              // 默认情况
+              params.push(controlState.optionIndex);
+            }
+          } else {
+            // 默认值
+            params.push(null);
+          }
+        }
+
+        var opt = optionGenerator.apply(null, params);
+        chart.setOption(opt, true);
+      }
+
+      // 辅助函数：生成系列数据
+      function generateSeriesData(density, showLabel, labelPosition, labelRotate, distance) {
+        // 从固定数据中取相应长度的数据
+        var data = FIXED_DATA.slice(0, density);
+
+        return {
+          name: '数据系列',
+          type: 'bar',
+          data: data,
+          label: {
+            show: showLabel,
+            position: labelPosition,
+            rotate: labelRotate,
+            distance: distance,
+            formatter: '{c}'
+          }
+        };
+      }
+
+      // 辅助函数：生成X轴数据
+      function generateXAxisData(density) {
+        var data = [];
+        for (var i = 0; i < density; i++) {
+          data.push('项' + (i + 1));
+        }
+        return data;
+      }
+
+      // 辅助函数：根据布局位置生成legend配置
+      function getLegendConfig(layoutPosition, enableAutoLayout) {
+        return {
+          data: ['数据系列'],
+          autoLayout: {
+            enable: enableAutoLayout,
+            position: layoutPosition
+          }
+        };
+      }
+
+
+      // 辅助函数：生成场景1的配置（基本标签显示测试）
+      function getOption1(showLabel, labelPosition, labelRotate, dataDensity, distance, adaptiveLayout, layoutPosition, enableLegendAutoLayout) {
+
+        var option = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          legend: getLegendConfig(layoutPosition, enableLegendAutoLayout),
+          grid: {
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 0,
+            adaptiveLayout: adaptiveLayout
+          },
+          xAxis: {
+            type: 'category',
+            data: generateXAxisData(dataDensity)
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: generateSeriesData(dataDensity, showLabel, labelPosition, labelRotate, distance)
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景2的配置（水平条形图标签测试）
+      function getOption2(showLabel, labelPosition, labelRotate, dataDensity, distance, adaptiveLayout, layoutPosition, enableLegendAutoLayout) {
+
+        var option = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          legend: getLegendConfig(layoutPosition, enableLegendAutoLayout),
+          grid: {
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 0,
+            adaptiveLayout: adaptiveLayout
+          },
+          xAxis: {
+            type: 'value'
+          },
+          yAxis: {
+            type: 'category',
+            data: generateXAxisData(dataDensity)
+          },
+          series: generateSeriesData(dataDensity, showLabel, labelPosition, labelRotate, distance)
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景4的配置（极坐标系标签测试）
+      function getOption4(polarLabelPosition, distance, adaptiveLayout) {
+        // 为极坐标系准备数据（固定12个数据点）
+        var data = [];
+        for (var i = 0; i < 12; i++) {
+          data.push({
+            name: '项' + (i + 1),
+            value: FIXED_DATA[i] || 10
+          });
+        }
+
+        var option = {
+          tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b}: {c}'
+          },
+          polar: {
+            center: ['50%', '50%'],
+            radius: '100%'
+          },
+          angleAxis: {
+            type: 'category',
+            data: data.map(function (item) { return item.name; }),
+            startAngle: 90
+          },
+          radiusAxis: {
+            min: 0
+          },
+          series: [{
+            name: '数据系列',
+            type: 'bar',
+            coordinateSystem: 'polar',
+            data: data.map(function (item) { return item.value; }),
+            label: {
+              show: true,
+              position: polarLabelPosition,
+              rotate: 0,
+              distance: distance,
+              formatter: '{c}',
+              adaptiveLayout: adaptiveLayout
+            }
+          }]
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景5的配置（雷达图标签测试）
+      function getOption5(radarLabelPosition, distance, adaptiveLayout, radarLayoutPosition, enableAutoLayout) {
+        // 为雷达图准备数据（固定5个维度的数据）
+        var indicatorData = [
+          { name: '维度A', max: 100 },
+          { name: '维度B', max: 100 },
+          { name: '维度C', max: 100 },
+          { name: '维度D', max: 100 },
+          { name: '维度E', max: 100 }
+        ];
+
+        var seriesData = FIXED_DATA.slice(0, 5);
+
+        var option = {
+          tooltip: {
+            trigger: 'item'
+          },
+          // legend: enableAutoLayout ? getLegendConfig(radarLayoutPosition) : { data: ['数据系列'] },
+          radar: {
+            indicator: indicatorData,
+            center: ['50%', '55%'],
+            radius: '100%',
+            adaptiveLayout: adaptiveLayout
+          },
+          series: [{
+            name: '数据系列',
+            type: 'radar',
+            data: [{
+              name: '数据系列',
+              value: seriesData
+            }],
+            label: {
+              show: true,
+              position: radarLabelPosition,
+              distance: distance,
+              formatter: '{c}'
+            }
+          }]
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景6的配置（单轴坐标系标签测试）
+      function getOption6(singleLabelPosition, distance, adaptiveLayout, singleLayoutPosition, enableAutoLayout) {
+        // 为单轴坐标系准备数据（固定8个数据点）
+        var data = FIXED_DATA.slice(0, 8);
+
+        var option = {
+          tooltip: {
+            trigger: 'item'
+          },
+          legend: enableAutoLayout ? getLegendConfig(singleLayoutPosition, true) : { data: ['数据系列'] },
+          singleAxis: {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            type: 'category',
+            boundaryGap: false,
+            data: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+            axisLabel: {
+              interval: 0
+            },
+            adaptiveLayout: adaptiveLayout
+          },
+          series: [{
+            name: '数据系列',
+            coordinateSystem: 'singleAxis',
+            type: 'scatter',
+            data: data,
+            symbolSize: function (val) {
+              return val * 2;
+            },
+            label: {
+              show: true,
+              position: singleLabelPosition,
+              distance: distance,
+              formatter: '{c}'
+            }
+          }]
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景7的配置（日历坐标系标签测试）
+      function getOption7(enableCalendarLegendAutoLayout, calendarLayoutPosition, calendarLabelPosition, distance, adaptiveLayout, calendarLeft, calendarTop, calendarRight, calendarBottom) {
+        // 生成一个月的日期数据（固定数据）
+        function generateDateData(year, month, baseValue) {
+          var daysInMonth = new Date(year, month, 0).getDate();
+          var data = [];
+          for (var day = 1; day <= daysInMonth; day++) {
+            var dateStr = year + '-' + (month < 10 ? '0' + month : month) + '-' + (day < 10 ? '0' + day : day);
+            // 使用日期和baseValue生成固定但不同的值
+            var value = (baseValue + day * 3) % 100;
+            data.push([dateStr, value]);
+          }
+          return data;
+        }
+
+        var option = {
+          calendar: {
+            left: calendarLeft + '%',
+            top: calendarTop + '%',
+            right: calendarRight + '%',
+            bottom: calendarBottom + '%',
+            range: '2024-01',
+            cellSize: ['auto', 20],
+            dayLabel: {
+              show: true,
+              firstDay: 1
+            },
+            monthLabel: {
+              show: true
+            },
+            yearLabel: {
+              show: true
+            },
+            itemStyle: {
+              color: '#fff',
+              borderWidth: 1,
+              borderColor: '#ccc'
+            },
+            adaptiveLayout: adaptiveLayout
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 10),
+              itemStyle: { color: '#5470c6' },
+            },
+            {
+              name: '系列B',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 20),
+              itemStyle: { color: '#91cc75' },
+            },
+            {
+              name: '系列C',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 30),
+              itemStyle: { color: '#fac858' },
+            },
+            {
+              name: '系列D',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 40),
+              itemStyle: { color: '#ee6666' },
+              label: {
+                show: true,
+                position: calendarLabelPosition,
+                distance: distance,
+                adaptiveLayout: adaptiveLayout,
+                formatter: '{c}'
+              }
+            }
+          ]
+        };
+
+        if (enableCalendarLegendAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: calendarLayoutPosition,
+              align: 'center'
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景8的配置（矩阵坐标系标签测试）
+      function getOption8(enableMatrixLegendAutoLayout, matrixLayoutPosition, matrixLabelPosition, distance, adaptiveLayout) {
+        // 固定使用4个系列
+        var option = {
+          matrix: {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            x: {
+              data: ['产品A', '产品B', '产品C', '产品D']
+            },
+            y: {
+              data: ['Q1', 'Q2', 'Q3', 'Q4']
+            },
+            adaptiveLayout: adaptiveLayout
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                { name: '产品A-Q1', value: ['产品A', 'Q1', 80] },
+                { name: '产品A-Q2', value: ['产品A', 'Q2', 70] },
+                { name: '产品A-Q3', value: ['产品A', 'Q3', 65] },
+                { name: '产品A-Q4', value: ['产品A', 'Q4', 75] },
+                { name: '产品B-Q1', value: ['产品B', 'Q1', 60] },
+                { name: '产品B-Q2', value: ['产品B', 'Q2', 85] },
+                { name: '产品B-Q3', value: ['产品B', 'Q3', 90] },
+                { name: '产品B-Q4', value: ['产品B', 'Q4', 55] },
+                { name: '产品C-Q1', value: ['产品C', 'Q1', 45] },
+                { name: '产品C-Q2', value: ['产品C', 'Q2', 50] },
+                { name: '产品C-Q3', value: ['产品C', 'Q3', 75] },
+                { name: '产品C-Q4', value: ['产品C', 'Q4', 80] },
+                { name: '产品D-Q1', value: ['产品D', 'Q1', 90] },
+                { name: '产品D-Q2', value: ['产品D', 'Q2', 65] },
+                { name: '产品D-Q3', value: ['产品D', 'Q3', 50] },
+                { name: '产品D-Q4', value: ['产品D', 'Q4', 85] }
+              ],
+              label: { show: true, position: matrixLabelPosition, distance: distance, adaptiveLayout: adaptiveLayout, formatter: '{c}' },
+              itemStyle: { color: '#5470c6' }
+            },
+            {
+              name: '系列B',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                { name: '产品A-Q1-B', value: ['产品A', 'Q1', 70] },
+                { name: '产品A-Q2-B', value: ['产品A', 'Q2', 60] },
+                { name: '产品A-Q3-B', value: ['产品A', 'Q3', 55] },
+                { name: '产品A-Q4-B', value: ['产品A', 'Q4', 65] },
+                { name: '产品B-Q1-B', value: ['产品B', 'Q1', 50] },
+                { name: '产品B-Q2-B', value: ['产品B', 'Q2', 75] },
+                { name: '产品B-Q3-B', value: ['产品B', 'Q3', 80] },
+                { name: '产品B-Q4-B', value: ['产品B', 'Q4', 45] },
+                { name: '产品C-Q1-B', value: ['产品C', 'Q1', 35] },
+                { name: '产品C-Q2-B', value: ['产品C', 'Q2', 40] },
+                { name: '产品C-Q3-B', value: ['产品C', 'Q3', 65] },
+                { name: '产品C-Q4-B', value: ['产品C', 'Q4', 70] },
+                { name: '产品D-Q1-B', value: ['产品D', 'Q1', 80] },
+                { name: '产品D-Q2-B', value: ['产品D', 'Q2', 55] },
+                { name: '产品D-Q3-B', value: ['产品D', 'Q3', 40] },
+                { name: '产品D-Q4-B', value: ['产品D', 'Q4', 75] }
+              ],
+              itemStyle: { color: '#91cc75' }
+            },
+            {
+              name: '系列C',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                { name: '产品A-Q1-C', value: ['产品A', 'Q1', 60] },
+                { name: '产品A-Q2-C', value: ['产品A', 'Q2', 50] },
+                { name: '产品A-Q3-C', value: ['产品A', 'Q3', 45] },
+                { name: '产品A-Q4-C', value: ['产品A', 'Q4', 55] },
+                { name: '产品B-Q1-C', value: ['产品B', 'Q1', 40] },
+                { name: '产品B-Q2-C', value: ['产品B', 'Q2', 65] },
+                { name: '产品B-Q3-C', value: ['产品B', 'Q3', 70] },
+                { name: '产品B-Q4-C', value: ['产品B', 'Q4', 35] },
+                { name: '产品C-Q1-C', value: ['产品C', 'Q1', 25] },
+                { name: '产品C-Q2-C', value: ['产品C', 'Q2', 30] },
+                { name: '产品C-Q3-C', value: ['产品C', 'Q3', 55] },
+                { name: '产品C-Q4-C', value: ['产品C', 'Q4', 60] },
+                { name: '产品D-Q1-C', value: ['产品D', 'Q1', 70] },
+                { name: '产品D-Q2-C', value: ['产品D', 'Q2', 45] },
+                { name: '产品D-Q3-C', value: ['产品D', 'Q3', 30] },
+                { name: '产品D-Q4-C', value: ['产品D', 'Q4', 65] }
+              ],
+              itemStyle: { color: '#fac858' }
+            },
+            {
+              name: '系列D',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                { name: '产品A-Q1-D', value: ['产品A', 'Q1', 50] },
+                { name: '产品A-Q2-D', value: ['产品A', 'Q2', 40] },
+                { name: '产品A-Q3-D', value: ['产品A', 'Q3', 35] },
+                { name: '产品A-Q4-D', value: ['产品A', 'Q4', 45] },
+                { name: '产品B-Q1-D', value: ['产品B', 'Q1', 30] },
+                { name: '产品B-Q2-D', value: ['产品B', 'Q2', 55] },
+                { name: '产品B-Q3-D', value: ['产品B', 'Q3', 60] },
+                { name: '产品B-Q4-D', value: ['产品B', 'Q4', 25] },
+                { name: '产品C-Q1-D', value: ['产品C', 'Q1', 15] },
+                { name: '产品C-Q2-D', value: ['产品C', 'Q2', 20] },
+                { name: '产品C-Q3-D', value: ['产品C', 'Q3', 45] },
+                { name: '产品C-Q4-D', value: ['产品C', 'Q4', 50] },
+                { name: '产品D-Q1-D', value: ['产品D', 'Q1', 60] },
+                { name: '产品D-Q2-D', value: ['产品D', 'Q2', 35] },
+                { name: '产品D-Q3-D', value: ['产品D', 'Q3', 20] },
+                { name: '产品D-Q4-D', value: ['产品D', 'Q4', 55] }
+              ],
+              itemStyle: { color: '#ee6666' }
+            }
+          ]
+        };
+
+        if (enableMatrixLegendAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: matrixLayoutPosition,
+              align: 'center'
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景10的配置（参考线标签溢出测试）
+      function getOption10(markLineLabelPosition, distance, adaptiveLayout) {
+        var option = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'cross'
+            }
+          },
+          grid: {
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 1,
+            adaptiveLayout: adaptiveLayout
+          },
+          xAxis: {
+            type: 'category',
+            data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+          },
+          yAxis: {
+            type: 'value',
+            name: '销售额 (万元)',
+            min: 0,
+            max: 400
+          },
+          series: [
+            {
+              name: '月销售额',
+              type: 'bar',
+              data: [120, 132, 101, 134, 90, 230, 210, 182, 191, 234, 290, 330],
+              itemStyle: {
+                color: '#5470c6'
+              },
+              markLine: {
+                data: [
+                  {
+                    name: '平均线',
+                    type: 'average',
+                    label: {
+                      show: true,
+                      position: markLineLabelPosition,
+                      formatter: function (params) {
+                        return '平均值\n' + Math.round(params.value) + '万';
+                      },
+                      distance: distance,
+                      fontSize: 12,
+                      color: '#333'
+                    },
+                    lineStyle: {
+                      color: '#ff4444',
+                      width: 2,
+                      type: 'solid'
+                    }
+                  },
+                  {
+                    name: '最大值线',
+                    type: 'max',
+                    label: {
+                      show: true,
+                      position: markLineLabelPosition,
+                      formatter: function (params) {
+                        return '最大值\n' + params.value + '万';
+                      },
+                      distance: distance,
+                      fontSize: 12,
+                      color: '#333'
+                    },
+                    lineStyle: {
+                      color: '#44ff44',
+                      width: 2,
+                      type: 'solid'
+                    }
+                  },
+                  {
+                    name: '最小值线',
+                    type: 'min',
+                    label: {
+                      show: true,
+                      position: markLineLabelPosition,
+                      formatter: function (params) {
+                        return '最小值\n' + params.value + '万';
+                      },
+                      distance: distance,
+                      fontSize: 12,
+                      color: '#333'
+                    },
+                    lineStyle: {
+                      color: '#4444ff',
+                      width: 2,
+                      type: 'solid'
+                    }
+                  },
+                  {
+                    name: '目标线',
+                    yAxis: 250,
+                    label: {
+                      show: true,
+                      position: markLineLabelPosition,
+                      formatter: '年度目标\n250万',
+                      distance: distance,
+                      fontSize: 12,
+                      color: '#333'
+                    },
+                    lineStyle: {
+                      color: '#ff8844',
+                      width: 2,
+                      type: 'dashed'
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景9的配置（参考点标签溢出测试）
+      function getOption9(markPointLabelPosition, distance, adaptiveLayout, markPointSymbol) {
+        var option = {
+          tooltip: {
+            trigger: 'item',
+            axisPointer: {
+              type: 'cross'
+            }
+          },
+          grid: {
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: 0,
+            adaptiveLayout: adaptiveLayout
+          },
+          xAxis: {
+            type: 'category',
+            data: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+          },
+          yAxis: {
+            type: 'value',
+            name: '销售额 (万元)'
+          },
+          series: [
+            {
+              name: '销售额',
+              type: 'scatter',
+              data: [
+                [0, 120], [1, 132], [2, 101], [3, 134], [4, 90], [5, 230],
+                [6, 210], [7, 182], [8, 191], [9, 234], [10, 290], [11, 330]
+              ],
+              symbolSize: function (value) {
+                return Math.sqrt(value[1]) * 0.8;
+              },
+              itemStyle: {
+                color: '#5470c6'
+              },
+              markPoint: {
+                data: [
+                  {
+                    name: '最大值点',
+                    type: 'max',
+                    symbol: markPointSymbol,
+                    symbolSize: 60,
+                    label: {
+                      show: true,
+                      position: markPointLabelPosition,
+                      formatter: function (params) {
+                        return '最大值\n' + params.value + '万';
+                      },
+                      distance: distance,
+                      fontSize: 12,
+                      color: '#333'
+                    },
+                    itemStyle: {
+                      color: '#ff4444',
+                      borderColor: '#fff',
+                      borderWidth: 2
+                    }
+                  },
+                  // {
+                  //   name: '最小值点',
+                  //   type: 'min',
+                  //   symbol: 'arrow',
+                  //   symbolSize: 50,
+                  //   label: {
+                  //     show: true,
+                  //     position: markPointLabelPosition,
+                  //     formatter: function (params) {
+                  //       return '最小值\n' + params.value + '万';
+                  //     },
+                  //     distance: distance,
+                  //     fontSize: 12,
+                  //     color: '#333'
+                  //   },
+                  //   itemStyle: {
+                  //     color: '#44ff44',
+                  //     borderColor: '#fff',
+                  //     borderWidth: 2
+                  //   }
+                  // },
+                  // {
+                  //   name: '平均值点',
+                  //   type: 'average',
+                  //   symbol: 'diamond',
+                  //   symbolSize: 45,
+                  //   label: {
+                  //     show: true,
+                  //     position: markPointLabelPosition,
+                  //     formatter: function (params) {
+                  //       return '平均值\n' + Math.round(params.value) + '万';
+                  //     },
+                  //     distance: distance,
+                  //     fontSize: 12,
+                  //     color: '#333'
+                  //   },
+                  //   itemStyle: {
+                  //     color: '#4444ff',
+                  //     borderColor: '#fff',
+                  //     borderWidth: 2
+                  //   }
+                  // },
+                  // {
+                  //   name: '异常点',
+                  //   coord: [7, 182],
+                  //   symbol: 'triangle',
+                  //   symbolSize: 55,
+                  //   label: {
+                  //     show: true,
+                  //     position: markPointLabelPosition,
+                  //     formatter: '异常数据\n8月销售额',
+                  //     distance: distance,
+                  //     fontSize: 12,
+                  //     color: '#333'
+                  //   },
+                  //   itemStyle: {
+                  //     color: '#ff8844',
+                  //     borderColor: '#fff',
+                  //     borderWidth: 2
+                  //   }
+                  // }
+                ]
+              }
+            },
+            {
+              name: '利润率',
+              type: 'line',
+              yAxisIndex: 1,
+              data: [2.0, 4.9, 7.0, 23.2, 25.6, 76.7, 135.6, 162.2, 32.6, 20.0, 6.4, 3.3],
+              symbolSize: 8,
+              itemStyle: {
+                color: '#91cc75'
+              },
+              markPoint: {
+                data: [
+                  {
+                    name: '最小利润值',
+                    type: 'min',
+                    symbol: 'circle',
+                    symbolSize: 40,
+                    label: {
+                      show: true,
+                      position: markPointLabelPosition,
+                      formatter: function (params) {
+                        return '最小利润值\n' + params.value + '%';
+                      },
+                      distance: distance,
+                      fontSize: 11,
+                      color: '#333'
+                    },
+                    itemStyle: {
+                      color: '#fac858',
+                      borderColor: '#fff',
+                      borderWidth: 2
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        };
+
+        // 添加第二个Y轴用于利润率
+        option.yAxis = [
+          {
+            type: 'value',
+            name: '销售额 (万元)',
+            position: 'left'
+          },
+          {
+            type: 'value',
+            name: '利润率 (%)',
+            position: 'right',
+            splitLine: {
+              show: false
+            }
+          }
+        ];
+
+        return option;
+      }
+
+      var chart1Names = ['showLabel', 'labelPosition', 'labelRotate', 'dataDensity', 'distance', 'adaptiveLayout', 'layoutPosition', 'enableAutoLayout'];
+      var chart2Names = ['showLabel', 'labelPosition', 'labelRotate', 'dataDensity', 'distance', 'adaptiveLayout', 'layoutPosition', 'enableAutoLayout'];
+      var chart4Names = ['polarLabelPosition', 'distance', 'adaptiveLayout'];
+      var chart5Names = ['radarLabelPosition', 'distance', 'adaptiveLayout', 'radarLayoutPosition', 'enableAutoLayout'];
+      var chart6Names = ['singleLabelPosition', 'distance', 'adaptiveLayout', 'singleLayoutPosition', 'enableAutoLayout'];
+      var chart7Names = ['enableCalendarLegendAutoLayout', 'calendarLayoutPosition', 'calendarLabelPosition', 'distance', 'adaptiveLayout', 'calendarLeft', 'calendarTop', 'calendarRight', 'calendarBottom'];
+      var chart8Names = ['enableMatrixLegendAutoLayout', 'matrixLayoutPosition', 'matrixLabelPosition', 'distance', 'adaptiveLayout'];
+      var chart9Names = ['markPointLabelPosition', 'distance', 'adaptiveLayout', 'markPointSymbol'];
+      var chart10Names = ['markLineLabelPosition', 'distance', 'adaptiveLayout'];
+
+      // 基本标签显示测试
+      var chart1 = testHelper.create(echarts, 'series-label-auto-compress-basic', {
+        title: '系列标签显示基本测试',
+        option: getOption1(true, 'top', 0, 12, 20, true, 'bottom', true),
+        inputs: [
+          {
+            type: 'select',
+            text: '显示标签',
+            id: 'showLabel',
+            values: [false, true],
+            options: [
+              { text: '隐藏', value: false },
+              { text: '显示', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签位置',
+            id: 'labelPosition',
+            values: LABEL_POSITIONS,
+            options: LABEL_POSITION_OPTIONS,
+            value: 'top',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签旋转',
+            id: 'labelRotate',
+            values: [0, 45, 90, -45, -90],
+            options: [
+              { text: '0°', value: 0 },
+              { text: '45°', value: 45 },
+              { text: '90°', value: 90 },
+              { text: '-45°', value: -45 },
+              { text: '-90°', value: -90 }
+            ],
+            value: 0,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '数据密度',
+            id: 'dataDensity',
+            values: [6, 12, 24, 48],
+            options: [
+              { text: '6个数据点（稀疏）', value: 6 },
+              { text: '12个数据点（中等）', value: 12 },
+              { text: '24个数据点（密集）', value: 24 },
+              { text: '48个数据点（很高）', value: 48 }
+            ],
+            value: 12,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 50,
+            value: 20,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局位置',
+            id: 'layoutPosition',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部', value: 'bottom' },
+              { text: '顶部', value: 'top' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '启用图例自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          }
+        ]
+      });
+
+      // 水平条形图标签测试
+      var chart2 = testHelper.create(echarts, 'series-label-auto-compress-horizontal', {
+        title: '水平条形图标签测试',
+        option: getOption2(true, 'right', 0, 12, 30, true, 'right', true),
+        inputs: [
+          {
+            type: 'select',
+            text: '显示标签',
+            id: 'showLabel',
+            values: [false, true],
+            options: [
+              { text: '隐藏', value: false },
+              { text: '显示', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签位置',
+            id: 'labelPosition',
+            values: LABEL_POSITIONS,
+            options: LABEL_POSITION_OPTIONS,
+            value: 'right',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签旋转',
+            id: 'labelRotate',
+            values: [0, 45, 90, -45, -90],
+            options: [
+              { text: '0°', value: 0 },
+              { text: '45°', value: 45 },
+              { text: '90°', value: 90 },
+              { text: '-45°', value: -45 },
+              { text: '-90°', value: -90 }
+            ],
+            value: 0,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '数据密度',
+            id: 'dataDensity',
+            values: [6, 12, 24, 48],
+            options: [
+              { text: '6个数据点（稀疏）', value: 6 },
+              { text: '12个数据点（中等）', value: 12 },
+              { text: '24个数据点（密集）', value: 24 },
+              { text: '48个数据点（很高）', value: 48 }
+            ],
+            value: 12,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 50,
+            value: 30,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局位置',
+            id: 'layoutPosition',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部', value: 'bottom' },
+              { text: '顶部', value: 'top' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'right',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '启用图例自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          }
+        ]
+      });
+
+      // 极坐标系标签测试
+      var chart4 = testHelper.create(echarts, 'series-label-auto-compress-polar', {
+        title: '极坐标系标签测试',
+        option: getOption4('end', 40, true),
+        inputs: [
+          {
+            type: 'select',
+            text: '极坐标标签位置',
+            id: 'polarLabelPosition',
+            values: ['start', 'inside', 'middle', 'end'],
+            options: [
+              { text: '开始', value: 'start' },
+              { text: '内部', value: 'inside' },
+              { text: '中间', value: 'middle' },
+              { text: '结束', value: 'end' }
+            ],
+            value: 'end',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 40,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          }
+        ]
+      });
+
+      // 雷达图标签测试
+      var chart5 = testHelper.create(echarts, 'series-label-auto-compress-radar', {
+        title: '雷达图标签测试',
+        option: getOption5('bottom', 40, true, 'bottom', true),
+        inputs: [
+          {
+            type: 'select',
+            text: '雷达图标签位置',
+            id: 'radarLabelPosition',
+            values: ['top', 'inside', 'bottom'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '内部', value: 'inside' },
+              { text: '底部', value: 'bottom' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 40,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          // {
+          //   type: 'select',
+          //   text: '布局位置',
+          //   id: 'radarLayoutPosition',
+          //   values: ['bottom', 'top', 'left', 'right'],
+          //   options: [
+          //     { text: '底部', value: 'bottom' },
+          //     { text: '顶部', value: 'top' },
+          //     { text: '左侧', value: 'left' },
+          //     { text: '右侧', value: 'right' }
+          //   ],
+          //   value: 'bottom',
+          //   onchange: function () {
+          //     handleOptionChange(chart5, getOption5, chart5Names);
+          //   }
+          // },
+          // {
+          //   type: 'select',
+          //   text: '启用图例自动布局',
+          //   id: 'enableAutoLayout',
+          //   values: [false, true],
+          //   options: [
+          //     { text: '关闭', value: false },
+          //     { text: '开启', value: true }
+          //   ],
+          //   value: true,
+          //   onchange: function () {
+          //     handleOptionChange(chart5, getOption5, chart5Names);
+          //   }
+          // }
+        ]
+      });
+
+      // 单轴坐标系标签测试
+      var chart6 = testHelper.create(echarts, 'series-label-auto-compress-single', {
+        title: '单轴坐标系标签测试',
+        option: getOption6('top', 85, true, 'bottom', true),
+        inputs: [
+          {
+            type: 'select',
+            text: '单轴标签位置',
+            id: 'singleLabelPosition',
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '中间', value: 'middle' },
+              { text: '底部', value: 'bottom' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'top',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 85,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '启用图例自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局位置',
+            id: 'singleLayoutPosition',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部', value: 'bottom' },
+              { text: '顶部', value: 'top' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          }
+        ]
+      });
+
+      // 日历坐标系标签测试
+      var chart7 = testHelper.create(echarts, 'series-label-auto-compress-calendar', {
+        title: '日历坐标系标签测试',
+        option: getOption7(true, 'bottom', 'top', 50, true, 2, 10, 2, 5),
+        inputs: [
+          {
+            type: 'select',
+            text: '日历标签位置',
+            id: 'calendarLabelPosition',
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '中间', value: 'middle' },
+              { text: '底部', value: 'bottom' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'top',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '启用图例自动布局',
+            id: 'enableCalendarLegendAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '图例位置',
+            id: 'calendarLayoutPosition',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '日历位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Calendar Left',
+            id: 'calendarLeft',
+            min: 0,
+            max: 50,
+            value: 2,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Top',
+            id: 'calendarTop',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Right',
+            id: 'calendarRight',
+            min: 0,
+            max: 50,
+            value: 2,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Bottom',
+            id: 'calendarBottom',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          }
+        ]
+      });
+
+      // 矩阵坐标系标签测试
+      var chart8 = testHelper.create(echarts, 'series-label-auto-compress-matrix', {
+        title: '矩阵坐标系标签测试',
+        option: getOption8(true, 'bottom', 'bottom', 20, true),
+        inputs: [
+          {
+            type: 'select',
+            text: '矩阵标签位置',
+            id: 'matrixLabelPosition',
+            values: ['top', 'middle', 'bottom', 'left', 'right'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '中间', value: 'middle' },
+              { text: '底部', value: 'bottom' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 20,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '启用图例自动布局',
+            id: 'enableMatrixLegendAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '图例位置',
+            id: 'matrixLayoutPosition',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          }
+        ]
+      });
+
+      // 参考线标签溢出测试
+      var chart10 = testHelper.create(echarts, 'series-label-auto-compress-markline', {
+        title: '参考线标签溢出测试',
+        option: getOption10('end', 10, true),
+        inputs: [
+          {
+            type: 'select',
+            text: '参考线标签位置',
+            id: 'markLineLabelPosition',
+            values: ['start', 'middle', 'end'],
+            options: [
+              { text: '起点', value: 'start' },
+              { text: '中间', value: 'middle' },
+              { text: '终点', value: 'end' }
+            ],
+            value: 'end',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 10,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          }
+        ]
+      });
+
+      // 参考点标签溢出测试
+      var chart9 = testHelper.create(echarts, 'series-label-auto-compress-markpoint', {
+        title: '参考点标签溢出测试',
+        option: getOption9('top', 10, true, 'pin'),
+        inputs: [
+          {
+            type: 'select',
+            text: '参考点标签位置',
+            id: 'markPointLabelPosition',
+            values: ['top', 'bottom', 'left', 'right', 'inside', 'insideTop', 'insideLeft', 'insideRight', 'insideBottom'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '底部', value: 'bottom' },
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' },
+              { text: '内部', value: 'inside' },
+              { text: '内部顶部', value: 'insideTop' },
+              { text: '内部左侧', value: 'insideLeft' },
+              { text: '内部右侧', value: 'insideRight' },
+              { text: '内部底部', value: 'insideBottom' }
+            ],
+            value: 'top',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '标签距离',
+            id: 'distance',
+            min: 0,
+            max: 100,
+            value: 10,
+            step: 1,
+            suffix: 'px',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签自动压缩',
+            id: 'adaptiveLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '参考点符号',
+            id: 'markPointSymbol',
+            values: ['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow'],
+            options: [
+              { text: '圆形', value: 'circle' },
+              { text: '矩形', value: 'rect' },
+              { text: '圆角矩形', value: 'roundRect' },
+              { text: '三角形', value: 'triangle' },
+              { text: '菱形', value: 'diamond' },
+              { text: '图钉', value: 'pin' },
+              { text: '箭头', value: 'arrow' }
+            ],
+            value: 'pin',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          }
+        ]
+      });
+    });
+  </script>
+</body>
+
+</html>

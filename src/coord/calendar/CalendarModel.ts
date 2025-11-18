@@ -89,6 +89,13 @@ export interface CalendarOption extends ComponentOption, BoxLayoutOptionMixin {
      */
     range?: OptionDataValueDate | (OptionDataValueDate)[]
 
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean
+
     dayLabel?: Omit<LabelOption, 'position'> & {
         /**
          * First day of week.
@@ -202,6 +209,9 @@ class CalendarModel extends ComponentModel<CalendarOption> implements Coordinate
 
         // horizontal vertical
         orient: 'horizontal',
+
+        // 自适应布局
+        adaptiveLayout: false,
 
         // month separate line style
         splitLine: {

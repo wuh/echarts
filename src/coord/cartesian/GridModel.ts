@@ -49,6 +49,12 @@ export interface GridOption extends ComponentOption,
      */
     containLabel?: boolean;
     /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean;
+    /**
      * Define a constrains rect.
      * Axis lines is firstly laid out based on the rect defined by `grid.left/right/top/bottom/width/height`.
      * (for axis line alignment requirements between multiple grids)
@@ -131,6 +137,7 @@ class GridModel extends ComponentModel<GridOption> implements CoordinateSystemHo
         bottom: 80,
         // If grid size contain label
         containLabel: false,
+        adaptiveLayout: false,
         outerBoundsMode: 'auto',
         outerBounds: OUTER_BOUNDS_DEFAULT,
         outerBoundsContain: 'all',

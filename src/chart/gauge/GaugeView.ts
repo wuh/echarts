@@ -34,6 +34,13 @@ import ZRImage from 'zrender/src/graphic/Image';
 import { extend, isFunction, isString, isNumber, each } from 'zrender/src/core/util';
 import {setCommonECData} from '../../util/innerStore';
 import { normalizeArcAngles } from 'zrender/src/core/PathProxy';
+import {
+    LegendAvoidableSeriesView,
+    LayoutLegendContext,
+    applyMarginToCircularLayout,
+    calculateCircularBoundingRect
+} from '../../util/autoLayout';
+import BoundingRect from 'zrender/lib/core/BoundingRect';
 
 type ECSymbol = ReturnType<typeof createSymbol>;
 
@@ -73,7 +80,7 @@ function formatLabel(value: number, labelFormatter: string | ((value: number) =>
     return label;
 }
 
-class GaugeView extends ChartView {
+class GaugeView extends ChartView implements LegendAvoidableSeriesView {
     static type = 'gauge' as const;
     type = GaugeView.type;
 
@@ -83,6 +90,9 @@ class GaugeView extends ChartView {
     private _titleEls: graphic.Text[];
     private _detailEls: graphic.Text[];
 
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext | undefined;
+
     render(seriesModel: GaugeSeriesModel, ecModel: GlobalModel, api: ExtensionAPI) {
 
         this.group.removeAll();
@@ -90,11 +100,42 @@ class GaugeView extends ChartView {
         const colorList = seriesModel.get(['axisLine', 'lineStyle', 'color']);
         const posInfo = parsePosition(seriesModel, api);
 
+        // 处理自动布局上下文中的边距压缩
+        const margin = this.autoLayoutContext?.margin;
+        if (margin != null) {
+            // 使用公共函数将margin应用到圆形布局中
+            const adjusted = applyMarginToCircularLayout(
+                margin,
+                posInfo.cx,
+                posInfo.cy,
+                posInfo.r,
+                0  // gauge 没有内半径
+            );
+            posInfo.cx = adjusted.cx;
+            posInfo.cy = adjusted.cy;
+            posInfo.r = adjusted.r;
+        }
+
         this._renderMain(
             seriesModel, ecModel, api, colorList, posInfo
         );
 
         this._data = seriesModel.getData();
+    }
+
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: GaugeSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: any
+    ): BoundingRect {
+        const posInfo = parsePosition(seriesModel, api);
+        return calculateCircularBoundingRect(
+            posInfo.cx,
+            posInfo.cy,
+            posInfo.r
+        );
     }
 
     dispose() {}

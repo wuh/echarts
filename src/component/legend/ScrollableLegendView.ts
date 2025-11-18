@@ -230,6 +230,145 @@ class ScrollableLegendView extends LegendView {
         return mainRect;
     }
 
+    /**
+     * @override
+     */
+    layoutInnerForEstimate(
+        legendModel: ScrollableLegendModel,
+        itemAlign: ScrollableLegendOption['align'],
+        selector: LegendSelectorButtonOption[],
+        selectorPosition: ScrollableLegendOption['selectorPosition'],
+        api: ExtensionAPI
+    ): ZRRectLike {
+        // 将 legendModel 强制转换为 ScrollableLegendModel，确保后续类型安全
+        const scrollableModel = legendModel as ScrollableLegendModel;
+        // 获取图例按钮组（selectorGroup），用于后续布局计算
+        const selectorGroup = this.getSelectorGroup();
+
+        // 获取布局方向相关的下标和属性（如长宽/xy）
+        // orientIdx: 0 表示水平布局，1 表示垂直布局
+        const orientIdx = scrollableModel.getOrient().index;
+        const wh = WH[orientIdx];   // 主轴方向长度的 key（'width' 或 'height'）
+        const xy = XY[orientIdx];   // 主轴方向位置的 key（'x' 或 'y'）
+        const hw = WH[1 - orientIdx];  // 交叉轴长度的 key
+        const yx = XY[1 - orientIdx];  // 交叉轴位置的 key
+
+        // 将 selector 参数转换为 LegendSelectorButtonOption 数组
+        const selectorArr = selector as LegendSelectorButtonOption[];
+
+        // 如果存在 selector 按钮组，则始终以水平方式对其进行布局
+        selectorArr && layoutUtil.box(
+            'horizontal',
+            selectorGroup,
+            scrollableModel.get('selectorItemGap', true)  // 按钮之间的间距
+        );
+
+        // 获取 selector 按钮组与主内容的分隔间距
+        const selectorButtonGap = scrollableModel.get('selectorButtonGap', true);
+        // 获取 selectorGroup 布局后的包围盒，后续根据宽高调整整体布局
+        const selectorRect = selectorGroup.getBoundingRect();
+
+        // 获取图例布局的参考容器，用于后续最大尺寸的计算
+        const refContainer = layoutUtil.createBoxLayoutReference(scrollableModel, api).refContainer;
+        // 解析 box layout 参数（如 left/top/width/height 等），结合用户配置
+        const positionInfo = scrollableModel.getBoxLayoutParams();
+        // 图例的内边距（padding），影响内容区域
+        const padding = scrollableModel.get('padding');
+        // 计算当前图例组件在画布上的最大允许尺寸
+        const maxSize = layoutUtil.getLayoutRect(positionInfo, refContainer, padding);
+
+        // 克隆 maxSize 对象，用于分配给主内容区的实际最大尺寸
+        const processMaxSize = zrUtil.clone(maxSize);
+
+        // 若存在 selector 按钮组，需在主轴方向上为按钮及分隔间隙预留空间
+        selectorArr && (processMaxSize[wh] = maxSize[wh] - selectorRect[wh] - selectorButtonGap);
+
+        // 估算主内容和翻页控件的尺寸，这里不进行真实渲染，仅做空间预估
+        const mainRect = this._layoutContentAndControllerForEstimate(
+            scrollableModel, false,
+            processMaxSize, orientIdx, wh, hw, yx, xy
+        );
+
+        // 若有 selector 按钮组，则主轴长度需加上 selectorGroup 的长度及按钮间隙
+        if (selectorArr) {
+            mainRect[wh] += selectorRect[wh] + selectorButtonGap;
+            // 交叉轴取较大值，保证整体高度/宽度足够
+            mainRect[hw] = Math.max(mainRect[hw], selectorRect[hw]);
+        }
+
+        // 返回计算得到的整体包围盒（主内容 + 按钮组），用于自动布局等场景
+        return mainRect;
+    }
+
+    _layoutContentAndControllerForEstimate(
+        legendModel: ScrollableLegendModel,
+        isFirstRender: boolean,
+        maxSize: { width: number, height: number },
+        orientIdx: 0 | 1,
+        wh: 'width' | 'height',
+        hw: 'width' | 'height',
+        yx: 'x' | 'y',
+        xy: 'y' | 'x'
+    ): ZRRectLike {
+        const contentGroup = this.getContentGroup();
+        const controllerGroup = this._controllerGroup;
+
+        // 图例主要内容区域布局，根据方向和最大空间做内部元素排布
+        layoutUtil.box(
+            legendModel.get('orient'),                    // 用户配置的布局方向（水平/垂直）
+            contentGroup,
+            legendModel.get('itemGap'),                   // 图例项之间的间距
+            !orientIdx ? null : maxSize.width,            // 主轴为竖向时主内容最大宽度受限
+            orientIdx ? null : maxSize.height             // 主轴为横向时主内容最大高度受限
+        );
+
+        // 翻页按钮（控制器按钮）一律横向排布，无论内容区域方向
+        layoutUtil.box(
+            'horizontal',
+            controllerGroup,
+            legendModel.get('pageButtonItemGap', true)    // 翻页按钮之间的间距
+        );
+
+        const contentRect = contentGroup.getBoundingRect();      // 主内容包围盒
+        const controllerRect = controllerGroup.getBoundingRect();// 控制器按钮包围盒
+        // 判断主内容是否溢出显示区域，需要显示翻页按钮。超过主轴最大尺寸时显示，否则隐藏
+        const showController = contentRect[wh] > maxSize[wh];
+
+        // 估算本组件整体包围盒（返回值），不直接用 group 的 getBoundingRect，避免包含溢出部分
+        const mainRect = { x: 0, y: 0 } as ZRRectLike;
+
+        // 主轴长度，如超出最大可用空间则裁剪为最大空间，否则为内容自身长度
+        mainRect[wh] = showController ? maxSize[wh] : contentRect[wh];
+        // 交叉轴长度取主内容与控制器中较大的那一个，保证容纳下所有元素
+        mainRect[hw] = Math.max(contentRect[hw], controllerRect[hw]);
+
+        // 针对翻页按钮位置，对返回主包围盒的位置进行修正
+        if (showController) {
+            const pageButtonPosition = legendModel.get('pageButtonPosition', true);  // 翻页按钮放置位置（'start' 或 'end'）
+            const pageButtonGap = zrUtil.retrieve2(
+                legendModel.get('pageButtonGap', true),
+                legendModel.get('itemGap', true)         // 若未指定使用 itemGap 作为备用
+            );
+
+            // 'end' 表示按钮在主内容尾部
+            if (pageButtonPosition === 'end') {
+                // 控制器在末端时，将主轴方向的位置向负方向移动遮住溢出（例如：
+                // 主轴为 x，则 mainRect.x = min(mainRect.x, -controllerRect[wh])）
+                mainRect[yx] = Math.min(mainRect[yx], -controllerRect[wh]);
+            }
+            // 'start' 或其它，控制器在首部，主轴位移考虑翻页按钮宽度及间距
+            else {
+                mainRect[yx] = Math.min(mainRect[yx], controllerRect[wh] + pageButtonGap);
+            }
+        }
+        else {
+            // 没有溢出，无需翻页，仅考虑控制器位置对包围盒的影响
+            mainRect[yx] = Math.min(0, controllerRect[yx]);
+        }
+
+        return mainRect;
+    }
+
     _layoutContentAndController(
         legendModel: ScrollableLegendModel,
         isFirstRender: boolean,

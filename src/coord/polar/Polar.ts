@@ -23,15 +23,25 @@ import PolarModel from './PolarModel';
 import { CoordinateSystem, CoordinateSystemMaster, CoordinateSystemClipArea } from '../CoordinateSystem';
 import GlobalModel from '../../model/Global';
 import { ParsedModelFinder, ParsedModelFinderKnown } from '../../util/model';
-import { ScaleDataValue } from '../../util/types';
+import { ScaleDataValue, ZRRectLike } from '../../util/types';
 import ExtensionAPI from '../../core/ExtensionAPI';
+import {
+    LegendAvoidableCoordinateSystem,
+    LayoutLegendContext,
+    fillLegendGroupSpaceToMargin,
+    calculateRectWithAxisLabels,
+    applyMarginToCircularLayout
+} from '../../util/autoLayout';
+import BoundingRect from 'zrender/src/core/BoundingRect';
+import AxisBuilder, { AxisBuilderSharedContext, getLabelInner } from '../../component/axis/AxisBuilder';
+import { expandOrShrinkRect } from '../../util/graphic';
 
 export const polarDimensions = ['radius', 'angle'];
 
 interface Polar {
     update(ecModel: GlobalModel, api: ExtensionAPI): void
 }
-class Polar implements CoordinateSystem, CoordinateSystemMaster {
+class Polar implements CoordinateSystem, CoordinateSystemMaster, LegendAvoidableCoordinateSystem {
 
     readonly name: string;
 
@@ -56,6 +66,9 @@ class Polar implements CoordinateSystem, CoordinateSystemMaster {
     axisPointerEnabled = true;
 
     model: PolarModel;
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    autoLayoutContext: LayoutLegendContext | undefined;
 
     constructor(name: string) {
         this.name = name || '';
@@ -258,6 +271,136 @@ class Polar implements CoordinateSystem, CoordinateSystemMaster {
     ) {
         const coordSys = getCoordSys(finder);
         return coordSys === this ? this.pointToData(pixel) : null;
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    getOuterBoundingRect(): BoundingRect | null {
+        const area = this.getArea();
+        return new BoundingRect(
+            area.x,
+            area.y,
+            area.width,
+            area.height
+        );
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    applyAutoLayout(ecModel: GlobalModel, api: ExtensionAPI): void {
+        this.update(ecModel, api);
+        const autoLayoutContext = this.autoLayoutContext;
+        // 检查自动布局上下文是否存在
+        if (autoLayoutContext == null) {
+            return;
+        }
+
+        const radiusAxis = this.getRadiusAxis();
+        const angleAxis = this.getAngleAxis();
+
+        // 计算包含轴标签的矩形
+        let polarRectWithAxisLabels: ZRRectLike;
+        if (autoLayoutContext.needLayout === true) {
+            // 创建轴构建器共享上下文来计算包含轴标签的矩形
+            const axisBuilderSharedCtx = new AxisBuilderSharedContext(() => {});
+
+            // 为半径轴和角度轴构建轴以获取标签信息，直接使用RadiusAxisView的layoutAxis函数
+            if (radiusAxis.model) {
+                const axisAngle = angleAxis.getExtent()[0];
+                const layout = {
+                    position: [this.cx, this.cy],
+                    rotation: axisAngle / 180 * Math.PI,
+                    labelDirection: -1 as const,
+                    tickDirection: -1 as const,
+                    nameDirection: 1 as const,
+                    labelRotate: radiusAxis.model?.getModel('axisLabel').get('rotate'),
+                    // Over splitLine and splitArea
+                    z2: 1
+                };
+                const axisBuilder = new AxisBuilder(radiusAxis.model, api, layout, axisBuilderSharedCtx);
+                // 构建必要的部分用于布局计算，先估算再确定
+                axisBuilder.build({ axisTickLabelEstimate: true, axisName: true });
+            }
+            if (angleAxis.model) {
+                // 为角度轴创建布局参数，参考AngleAxisView的处理方式
+                const layout = {
+                    position: [this.cx, this.cy],
+                    rotation: 0,
+                    labelDirection: -1 as const,
+                    tickDirection: -1 as const,
+                    nameDirection: 1 as const,
+                    labelRotate: angleAxis.model.getModel('axisLabel').get('rotate'),
+                    z2: 1
+                };
+                const axisBuilder = new AxisBuilder(angleAxis.model, api, layout, axisBuilderSharedCtx);
+                // 构建必要的部分用于布局计算，先估算再确定
+                axisBuilder.build({ axisTickLabelEstimate: true, axisName: true });
+                const sharedRecord = axisBuilderSharedCtx.ensureRecord(angleAxis.model);
+                 // 调整角度轴标签的rect位置，使其反映环形分布
+                if (sharedRecord.labelInfoList) {
+                    const radiusExtent = radiusAxis.getExtent();
+                    const r = radiusExtent[1]; // 使用外半径
+                    const labelMargin = angleAxis.model.getModel('axisLabel').get('margin') || 8;
+
+                    sharedRecord.labelInfoList.forEach(labelInfo => {
+                        // 获取标签的角度坐标
+                        const labelInner = getLabelInner(labelInfo.label);
+                        const tickValue = labelInner.tickValue;
+                        const angleCoord = angleAxis.dataToCoord(tickValue);
+                        // 计算在极坐标中的位置
+                        const point = this.coordToPoint([r + labelMargin, angleCoord]);
+                        // 更新rect的中心位置
+                        labelInfo.rect.x = point[0] - labelInfo.rect.width / 2;
+                        labelInfo.rect.y = point[1] - labelInfo.rect.height / 2;
+                    });
+                }
+            }
+
+            // 计算包含轴标签的基础Polar矩形
+            const basePolarRect = this.getOuterBoundingRect();
+
+            // 使用calculateRectWithAxisLabels计算准确的包含标签的矩形
+            polarRectWithAxisLabels = calculateRectWithAxisLabels(
+                basePolarRect, [radiusAxis, angleAxis], axisBuilderSharedCtx
+            );
+
+            // 填充图例空间到 margin
+            fillLegendGroupSpaceToMargin(
+                autoLayoutContext.group,
+                api,
+                polarRectWithAxisLabels,
+                null,
+                autoLayoutContext
+            );
+        }
+        else {
+            // 使用基础外接矩形
+            polarRectWithAxisLabels = this.getOuterBoundingRect();
+        }
+
+        // 应用margin调整到半径和中心点
+        if (autoLayoutContext.margin != null) {
+            const contextMargin = this.autoLayoutContext.margin;
+            const area = this.getArea();
+
+            const adjustedLayout = applyMarginToCircularLayout(
+                contextMargin, this.cx, this.cy, area.r, area.r0
+            );
+
+            this.cx = adjustedLayout.cx;
+            this.cy = adjustedLayout.cy;
+
+            // 更新半径轴的范围
+            radiusAxis.inverse
+                ? radiusAxis.setExtent(adjustedLayout.r, area.r0)
+                : radiusAxis.setExtent(area.r0, adjustedLayout.r);
+
+            // 使用计算出的压缩量来扩展矩形
+            if (autoLayoutContext.needLayout) {
+                expandOrShrinkRect(polarRectWithAxisLabels, contextMargin, true, true);
+            }
+        }
+
+        // 设置最终的外接矩形
+        autoLayoutContext.finalBoundingRect = polarRectWithAxisLabels;
     }
 }
 

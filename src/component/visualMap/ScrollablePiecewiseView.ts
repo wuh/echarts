@@ -588,6 +588,35 @@ export class ScrollablePiecewiseView extends PiecewiseVisualMapView {
 
         return index != null ? index : defaultIndex;
     }
+
+    /**
+     * @override
+     */
+    renderForEstimate(visualMapModel: ScrollablePiecewiseModel, ecModel: GlobalModel, api: ExtensionAPI): ZRRectLike {
+        // 先调用基类的方法获得基础估算
+        const baseRect = super.renderForEstimate(visualMapModel, ecModel, api);
+
+        // 获取容器最大尺寸
+        const refContainer = layoutUtil.createBoxLayoutReference(visualMapModel, api).refContainer;
+        const positionInfo = visualMapModel.getBoxLayoutParams();
+        const padding = visualMapModel.get('padding');
+        const maxSize = layoutUtil.getLayoutRect(positionInfo, refContainer, padding);
+
+        const orient = visualMapModel.get('orient');
+        const orientIdx = orient === 'vertical' ? 1 : 0;
+        const wh = WH[orientIdx];
+
+        // 如果宽度没有超过当前容器尺寸则直接返回
+        if (baseRect[wh] <= maxSize[wh]) {
+            return baseRect;
+        }
+
+        // 如果超过了说明需要显示滚动条，此时只需要返回对应的最大尺寸就行了
+        const result = zrUtil.clone(baseRect);
+        result[wh] = maxSize[wh];
+
+        return result;
+    }
 }
 
 export default ScrollablePiecewiseView;

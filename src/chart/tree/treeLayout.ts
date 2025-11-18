@@ -33,6 +33,7 @@ import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
 import TreeSeriesModel from './TreeSeries';
 import { createBoxLayoutReference, getLayoutRect } from '../../util/layout';
+import { expandOrShrinkRect } from '../../util/graphic';
 
 export default function treeLayout(ecModel: GlobalModel, api: ExtensionAPI) {
     ecModel.eachSeriesByType('tree', function (seriesModel: TreeSeriesModel) {
@@ -40,9 +41,12 @@ export default function treeLayout(ecModel: GlobalModel, api: ExtensionAPI) {
     });
 }
 
-function commonLayout(seriesModel: TreeSeriesModel, api: ExtensionAPI) {
+export function commonLayout(seriesModel: TreeSeriesModel, api: ExtensionAPI, margin?: number[]) {
     const refContainer = createBoxLayoutReference(seriesModel, api).refContainer;
     const layoutInfo = getLayoutRect(seriesModel.getBoxLayoutParams(), refContainer);
+    if (margin) {
+        expandOrShrinkRect(layoutInfo, margin, true, true);
+    }
     seriesModel.layoutInfo = layoutInfo;
     const layout = seriesModel.get('layout');
     let width = 0;

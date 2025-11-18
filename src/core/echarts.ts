@@ -44,6 +44,7 @@ import Element, { ElementEvent } from 'zrender/src/Element';
 import GlobalModel, {QueryConditionKindA, GlobalModelSetOptionOpts} from '../model/Global';
 import ExtensionAPI from './ExtensionAPI';
 import CoordinateSystemManager from './CoordinateSystem';
+import { LegendAutoLayoutManager } from '../util/autoLayout';
 import OptionManager from '../model/OptionManager';
 import backwardCompat from '../preprocessor/backwardCompat';
 import dataStack from '../processor/dataStack';
@@ -399,6 +400,7 @@ class ECharts extends Eventful<ECEventDefinition> {
     private _componentsMap: {[viewId: string]: ComponentView} = {};
 
     private _coordSysMgr: CoordinateSystemManager;
+    private _legendAutoLayoutMgr: LegendAutoLayoutManager;
 
     private _api: ExtensionAPI;
 
@@ -497,6 +499,7 @@ class ECharts extends Eventful<ECEventDefinition> {
         this._locale = createLocaleObject(opts.locale || SYSTEM_LANG);
 
         this._coordSysMgr = new CoordinateSystemManager();
+        this._legendAutoLayoutMgr = new LegendAutoLayoutManager();
 
         const api = this._api = createExtensionAPI(this);
 
@@ -1793,12 +1796,14 @@ class ECharts extends Eventful<ECEventDefinition> {
                 const zr = this._zr;
                 const coordSysMgr = this._coordSysMgr;
                 const scheduler = this._scheduler;
+                const legendAutoLayoutMgr = this._legendAutoLayoutMgr;
 
                 // update before setOption
                 if (!ecModel) {
                     return;
                 }
 
+                legendAutoLayoutMgr.reset();
                 ecModel.setUpdatePayload(payload);
 
                 scheduler.restoreData(ecModel, payload);
@@ -1824,10 +1829,16 @@ class ECharts extends Eventful<ECEventDefinition> {
                 // can be fetched when coord sys updating (consider the barGrid extent fix). But
                 // the drawback is the full coord info can not be fetched. Fortunately this full
                 // coord is not required in stream mode updater currently.
-                coordSysMgr.update(ecModel, api);
+                coordSysMgr.update(ecModel, api, legendAutoLayoutMgr);
 
                 clearColorPalette(ecModel);
                 scheduler.performVisualTasks(ecModel, payload);
+
+                // 无坐标系场景：在视觉任务之后执行系列级自动布局
+                legendAutoLayoutMgr.executeSeriesLayout(ecModel, api);
+
+                // 最终化自动布局：在所有布局计算完成后统一执行layoutGroup
+                legendAutoLayoutMgr.layoutComponents(api);
 
                 // Set background and dark mode before rendering, because they affect auto-color-determination
                 // in zrender Text, and consequently affect the bounding rect if stroke is added.

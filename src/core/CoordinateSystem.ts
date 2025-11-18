@@ -27,8 +27,12 @@ import ComponentModel from '../model/Component';
 import SeriesModel from '../model/Series';
 import { error } from '../util/log';
 import { CoordinateSystemDataCoord, NullUndefined } from '../util/types';
+import {
+    LegendAvoidableCoordinateSystem,
+    LegendAutoLayoutManager
+} from '../util/autoLayout';
 
-type CoordinateSystemCreatorMap = {[type: string]: CoordinateSystemCreator};
+type CoordinateSystemCreatorMap = { [type: string]: CoordinateSystemCreator };
 
 /**
  * FIXME:
@@ -81,10 +85,20 @@ class CoordinateSystemManager {
     /**
      * @see CoordinateSystem['create']
      */
-    update(ecModel: GlobalModel, api: ExtensionAPI): void {
-        zrUtil.each(this._normalMasterList, function (coordSys) {
-            coordSys.update && coordSys.update(ecModel, api);
-        });
+    update(ecModel: GlobalModel, api: ExtensionAPI, autoLayoutMgr: LegendAutoLayoutManager): void {
+        // 收集自动布局组件并准备
+        const needsAutoLayout = autoLayoutMgr?.collect(ecModel, api);
+
+        if (!needsAutoLayout) {
+            // 正常调用所有坐标系统的update
+            zrUtil.each(this._normalMasterList, function (coordSys) {
+                coordSys.update && coordSys.update(ecModel, api);
+            });
+            return;
+        }
+
+        const coordSysList = this.getCoordinateSystems() as LegendAvoidableCoordinateSystem[];
+        autoLayoutMgr.executeCoordSysLayout(coordSysList, ecModel, api);
     }
 
     getCoordinateSystems(): CoordinateSystemMaster[] {
@@ -137,10 +151,10 @@ export function registerLayOutOnCoordSysUsage(opt: {
     if (__DEV__) {
         zrUtil.assert(!coordSysUseMap.get(opt.fullType));
     }
-    coordSysUseMap.set(opt.fullType, {getCoord2: undefined}).getCoord2 = opt.getCoord2;
+    coordSysUseMap.set(opt.fullType, { getCoord2: undefined }).getCoord2 = opt.getCoord2;
 }
 const coordSysUseMap = zrUtil.createHashMap<
-    {getCoord2: BoxCoordinateSystemGetCoord2 | NullUndefined},
+    { getCoord2: BoxCoordinateSystemGetCoord2 | NullUndefined },
     ComponentModel['type']
 >();
 
@@ -162,7 +176,7 @@ export function getCoordForBoxCoordSys(
             coord = store.getCoord2(model);
         }
     }
-    return {coord, from};
+    return { coord, from };
 }
 
 /**
@@ -229,7 +243,7 @@ export function decideCoordSysUsageKind(
         }
     }
 
-    return {coordSysType, kind};
+    return { coordSysType, kind };
 }
 
 /**
@@ -298,7 +312,7 @@ export function injectCoordSysByOption(opt: {
         zrUtil.assert(!!coordSysType);
     }
 
-    let {kind, coordSysType: declaredType} = decideCoordSysUsageKind(targetModel, true);
+    let { kind, coordSysType: declaredType } = decideCoordSysUsageKind(targetModel, true);
 
     if (isDefaultDataCoordSys
         && kind !== CoordinateSystemUsageKind.dataCoordSys
@@ -345,7 +359,7 @@ type CoordSysInjectionProvider = (
 export const simpleCoordSysInjectionProvider: CoordSysInjectionProvider = function (coordSysType, injectTargetModel) {
     const coordSysModel = injectTargetModel.getReferringComponents(
         coordSysType, SINGLE_REFERRING
-    ).models[0] as (ComponentModel & {coordinateSystem: CoordinateSystem});
+    ).models[0] as (ComponentModel & { coordinateSystem: CoordinateSystem });
     return coordSysModel && coordSysModel.coordinateSystem;
 };
 

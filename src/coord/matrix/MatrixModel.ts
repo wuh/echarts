@@ -45,6 +45,13 @@ export interface MatrixOption extends ComponentOption, BoxLayoutOptionMixin {
     borderZ2?: number;
     tooltip?: CommonTooltipOption<MatrixTooltipFormatterParams>;
 
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean;
+
     // PENDING: do we need to support other states, i.e., `emphasis`, `blur`, `select`?
 }
 
@@ -276,6 +283,7 @@ const defaultMatrixOption: MatrixOption = {
         borderColor: tokens.color.axisLine,
         borderWidth: 1,
     },
+    adaptiveLayout: false,
 };
 
 

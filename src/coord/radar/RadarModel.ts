@@ -94,6 +94,13 @@ export interface RadarOption extends
         | ValueAxisBaseOption['boundaryGap']
 
     indicator?: RadarIndicatorOption[]
+
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean
 }
 
 export type InnerIndicatorAxisOption = AxisBaseOption & {
@@ -231,7 +238,9 @@ class RadarModel extends ComponentModel<RadarOption> implements CoordinateSystem
         splitArea: defaultsShow(valueAxisDefault.splitArea, true),
 
         // {text, min, max}
-        indicator: []
+        indicator: [],
+        // 自适应布局
+        adaptiveLayout: false
     };
 }
 

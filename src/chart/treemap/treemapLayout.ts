@@ -38,6 +38,7 @@ import ExtensionAPI from '../../core/ExtensionAPI';
 import { TreeNode } from '../../data/Tree';
 import Model from '../../model/Model';
 import { TreemapRenderPayload, TreemapMovePayload, TreemapZoomToNodePayload } from './treemapAction';
+import { expandOrShrinkRect } from '../../util/graphic';
 
 const mathMax = Math.max;
 const mathMin = Math.min;
@@ -86,7 +87,8 @@ export default {
         seriesModel: TreemapSeriesModel,
         ecModel: GlobalModel,
         api: ExtensionAPI,
-        payload?: TreemapZoomToNodePayload | TreemapRenderPayload | TreemapMovePayload
+        payload?: TreemapZoomToNodePayload | TreemapRenderPayload | TreemapMovePayload,
+        margin?: number[]
     ) {
         // Layout result in each node:
         // {x, y, width, height, area, borderWidth}
@@ -94,7 +96,9 @@ export default {
 
         const refContainer = layout.createBoxLayoutReference(seriesModel, api).refContainer;
         const layoutInfo = layout.getLayoutRect(seriesModel.getBoxLayoutParams(), refContainer);
-
+        if (margin != null) {
+            expandOrShrinkRect(layoutInfo, margin, true, true);
+        }
         const size = seriesOption.size || []; // Compatible with ec2.
         const containerWidth = parsePercent(
             retrieveValue(layoutInfo.width, size[0]),
