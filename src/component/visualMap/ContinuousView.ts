@@ -32,12 +32,13 @@ import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
 import Element, { ElementEvent } from 'zrender/src/Element';
 import { TextVerticalAlign, TextAlign } from 'zrender/src/core/types';
-import { ColorString, Payload } from '../../util/types';
+import { ColorString, Payload, ZRRectLike } from '../../util/types';
 import { parsePercent } from 'zrender/src/contain/text';
 import { setAsHighDownDispatcher } from '../../util/states';
 import { createSymbol } from '../../util/symbol';
 import ZRImage from 'zrender/src/graphic/Image';
 import { ECData, getECData } from '../../util/innerStore';
+import { applyPaddingToRect } from '../../util/autoLayout';
 import { createTextStyle } from '../../label/labelStyle';
 import { findEventDispatcher } from '../../util/event';
 
@@ -584,9 +585,9 @@ class ContinuousView extends VisualMapView {
         return new graphic.Group(
             (orient === 'horizontal' && !inverse)
             ? {scaleX: itemAlign === 'bottom' ? 1 : -1, rotation: Math.PI / 2}
-            : (orient === 'horizontal' && inverse)
+                : (orient === 'horizontal' && inverse)
             ? {scaleX: itemAlign === 'bottom' ? -1 : 1, rotation: -Math.PI / 2}
-            : (orient === 'vertical' && !inverse)
+                    : (orient === 'vertical' && !inverse)
             ? {scaleX: itemAlign === 'left' ? 1 : -1, scaleY: -1}
             : {scaleX: itemAlign === 'left' ? 1 : -1}
         );
@@ -923,6 +924,390 @@ class ContinuousView extends VisualMapView {
     dispose() {
         this._clearHoverLinkFromSeries();
         this._clearHoverLinkToSeries();
+    }
+
+    /**
+     * @override
+     */
+    renderForEstimate(visualMapModel: ContinuousModel, ecModel: GlobalModel, api: ExtensionAPI): ZRRectLike {
+        // 如果视觉映射组件设置为不显示，则直接返回空尺寸防止后续布局异常
+        if (visualMapModel.get('show') === false) {
+            return { x: 0, y: 0, width: 0, height: 0 };
+        }
+
+        // 创建一个临时 graphic.Group 用于测量尺寸
+        const tempGroup = new graphic.Group();
+
+        // 保存当前实例里 shapes 及 visualMapModel 状态，避免临时对象影响业务状态
+        const originalShapes = this._shapes;
+        const originalVisualMapModel = this.visualMapModel;
+        const tempShapes = {} as ShapeStorage;
+
+        try {
+            // 切换到估算状态，使用临时 shape 存储及 model
+            this._shapes = tempShapes;
+            this.visualMapModel = visualMapModel;
+
+            // 方向和是否可拖拽 handle 的模式，也需要在估算期间同步
+            this._orient = visualMapModel.get('orient');
+            this._useHandle = visualMapModel.get('calculable');
+
+            this._resetInterval();
+
+            // 封装主元素的生成流程（如 bar、文本、indicator 都使用透明色，仅供估算尺寸）
+            this._renderBarForEstimate(tempGroup);
+
+            // 构造两端 value 文本，实际用于测量上下/左右的文本所需空间
+            const dataRangeText = visualMapModel.get('text');
+            this._renderEndsTextForEstimate(tempGroup, dataRangeText, 0);
+            this._renderEndsTextForEstimate(tempGroup, dataRangeText, 1);
+
+            // 强制刷新视图布局，仅更新包围盒信息，不实际绘制
+            this._updateViewForEstimate(tempGroup, true);
+
+            // 获取完整 layout 区域并附加 padding
+            const layoutRect = tempGroup.getBoundingRect();
+            return applyPaddingToRect(layoutRect, visualMapModel);
+        }
+        finally {
+            // 始终恢复组件本身的 shapes 及 visualMapModel，确保后续真实渲染不受影响
+            this._shapes = originalShapes;
+            this.visualMapModel = originalVisualMapModel;
+        }
+    }
+
+    /**
+     * 生成估算用的 bar 区域及结构。
+     *
+     * 仅用于尺寸估算，所有实际图形均为透明且不会参与渲染，主要模拟实际组件结构以获得精确尺寸。
+     */
+    private _renderBarForEstimate(targetGroup: graphic.Group) {
+        const visualMapModel = this.visualMapModel;
+        const shapes = this._shapes;
+        const itemSize = visualMapModel.itemSize;
+        const orient = this._orient;
+        const useHandle = this._useHandle;
+        // 计算 bar 的对齐方式，确保布局估算和最终视图保持一致
+        const itemAlign = helper.getItemAlign(visualMapModel, this.api, itemSize);
+        // 创建主 bar group 以对齐位置
+        const mainGroup = shapes.mainGroup = this._createBarGroup(itemAlign);
+
+        // bar 上绘制渐变色的 group，这里透明化仅用于预估
+        const gradientBarGroup = new graphic.Group();
+        mainGroup.add(gradientBarGroup);
+
+        // 创建主 bar 的“无效范围”多边形，设置为透明，实际只需其形状数据用于布局测量
+        const outOfRangePolygon = createPolygon();
+        outOfRangePolygon.setStyle({
+            fill: 'transparent'
+        });
+        shapes.outOfRange = outOfRangePolygon;
+        gradientBarGroup.add(outOfRangePolygon);
+
+        // 配合圆角、bar 区域采用 clipPath 进一步拟合实际展示尺寸（clip 防溢出）
+        gradientBarGroup.setClipPath(new graphic.Rect({
+            shape: {
+                x: 0,
+                y: 0,
+                width: itemSize[0],
+                height: itemSize[1],
+                r: 3
+            }
+        }));
+
+        // 测试性用一个汉字，来评估 label 的最大高度/宽度，确保后续布局空间充足
+        const textRect = visualMapModel.textStyleModel.getTextRect('国');
+        const textSize = mathMax(textRect.width, textRect.height);
+
+        // 如果支持拖动 handle，则也创建透明 handle。数组初始化防止读取时不报错。
+        if (useHandle) {
+            shapes.handleThumbs = [];
+            shapes.handleLabels = [];
+            shapes.handleLabelPoints = [];
+
+            this._createHandleForEstimate(
+                visualMapModel, targetGroup, mainGroup, 0, itemSize, textSize, orient
+            );
+            this._createHandleForEstimate(
+                visualMapModel, targetGroup, mainGroup, 1, itemSize, textSize, orient
+            );
+        }
+
+        // 创建一个透明的 indicator 元素，用于占据实际情况下 indicator 需要的几何位置
+        this._createIndicatorForEstimate(visualMapModel, targetGroup, mainGroup, itemSize, textSize, orient);
+
+        // 最后将构造好的完整 group 挂到临时 group，便于统一 bbox 测算
+        targetGroup.add(mainGroup);
+    }
+
+    /**
+     * 生成 estimate 专用的 handle（拖拽操作点），只涉及布局不涉及事件或实际交
+     * 互。
+     *
+     * 该 handle 的样式均为透明，仅为测量其尺寸和占位。
+     */
+    private _createHandleForEstimate(
+        visualMapModel: ContinuousModel,
+        group: graphic.Group,
+        mainGroup: graphic.Group,
+        handleIndex: 0 | 1,
+        itemSize: number[],
+        textSize: number,
+        orient: Orient
+    ) {
+        // 计算 handle 大小，可为百分比类型
+        const handleSize = parsePercent(visualMapModel.get('handleSize'), itemSize[0]);
+        // 创建 handle 的形状，仅透明填充，不参与渲染
+        const handleThumb = createSymbol(
+            visualMapModel.get('handleIcon'),
+            -handleSize / 2, -handleSize / 2, handleSize, handleSize,
+            null, true
+        );
+        handleThumb.attr({
+            silent: true,
+            invisible: true,
+            x: itemSize[0] / 2
+        });
+        handleThumb.x = itemSize[0] / 2;
+        (handleThumb as graphic.Path).setStyle({
+            strokeNoScale: true,
+            strokeFirst: true
+        });
+        (handleThumb as graphic.Path).style.lineWidth *= 2;
+
+        // 仅结构性挂载至主 group，真实布局只考虑空间
+        mainGroup.add(handleThumb);
+
+        // handle 上的值文本，依然采用透明，仅用于占位
+        const textStyleModel = this.visualMapModel.textStyleModel;
+        const handleLabelStyle = createTextStyle(textStyleModel, {
+            x: 0,
+            y: 0,
+            text: ''
+        });
+        handleLabelStyle.fill = 'transparent';
+        handleLabelStyle.opacity = 0;
+        const handleLabel = new graphic.Text({
+            style: handleLabelStyle
+        });
+        group.add(handleLabel);
+
+        // handle label 的参考点，用于后续定位
+        const handleLabelPoint = [handleSize, 0];
+
+        // 塞到 shapes 里面保持一致结构，便于后续访问
+        const shapes = this._shapes;
+        shapes.handleThumbs[handleIndex] = handleThumb;
+        shapes.handleLabelPoints[handleIndex] = handleLabelPoint;
+        shapes.handleLabels[handleIndex] = handleLabel;
+    }
+
+    /**
+     * 生成 estimate 专用的 indicator 及其文本，仅用于占位和尺寸预估。
+     *
+     * indicator 用于鼠标悬浮值显示，与 handle 固定在主 group 上。
+     */
+    private _createIndicatorForEstimate(
+        visualMapModel: ContinuousModel,
+        group: graphic.Group,
+        mainGroup: graphic.Group,
+        itemSize: number[],
+        textSize: number,
+        orient: Orient
+    ) {
+        // 计算指示器的大小（可能与 bar 宽度成比例）
+        const scale = parsePercent(visualMapModel.get('indicatorSize'), itemSize[0]);
+        // 指示器主体，透明不可见
+        const indicator = createSymbol(
+            visualMapModel.get('indicatorIcon'),
+            -scale / 2, -scale / 2, scale, scale,
+            null, true
+        );
+        indicator.attr({
+            silent: true,
+            invisible: true,
+            x: itemSize[0] / 2
+        });
+        indicator.setStyle({
+            fill: 'transparent',
+            opacity: 0
+        });
+
+        mainGroup.add(indicator);
+
+        // 指示器上的 label，也做透明填充，避免影响主题布局
+        const textStyleModel = this.visualMapModel.textStyleModel;
+        const indicatorLabel = new graphic.Text({
+            silent: true,
+            invisible: true,
+            style: createTextStyle(textStyleModel, {
+                x: 0,
+                y: 0,
+                text: ''
+            })
+        });
+        indicatorLabel.setStyle({
+            fill: 'transparent',
+            opacity: 0
+        });
+        group.add(indicatorLabel);
+
+        // 计算 label 的挂载基准点 —— 水平方向右移一定距离，竖直方向直接顶上
+        const indicatorLabelPoint = [
+            (orient === 'horizontal' ? textSize / 2 : HOVER_LINK_OUT) + itemSize[0] / 2,
+            0
+        ];
+        const shapes = this._shapes;
+        shapes.indicator = indicator;
+        shapes.indicatorLabel = indicatorLabel;
+        shapes.indicatorLabelPoint = indicatorLabelPoint;
+
+        // 标记下一次显示 indicator 时需要特殊处理
+        this._firstShowIndicator = true;
+    }
+
+    /**
+     * 生成 estimate 状态下的两端文本（最大最小值说明）。
+     *
+     * 注意：这里只用于布局测量，不做可见文本渲染。
+     */
+    private _renderEndsTextForEstimate(
+        group: graphic.Group,
+        dataRangeText: string[],
+        endsIndex: 0 | 1,
+    ) {
+        // 估算场景下，只有配了文本才进行尺寸测量
+        if (!dataRangeText) {
+            return;
+        }
+        const visualMapModel = this.visualMapModel;
+        // 兼容旧版本 text 配置顺序问题：高值放前、低值放后
+        let text = dataRangeText[1 - endsIndex];
+        text = text != null ? text + '' : '';
+
+        const textGap = visualMapModel.get('textGap');
+        const itemSize = visualMapModel.itemSize;
+
+        // 拿到 bar 的参照 group，方便变换坐标求具体布局点
+        const barGroup = this._shapes.mainGroup;
+        const position = this._applyTransform(
+            [
+                itemSize[0] / 2,
+                endsIndex === 0 ? -textGap : itemSize[1] + textGap
+            ],
+            barGroup
+        ) as number[];
+        const orient = this._orient;
+        const textStyleModel = this.visualMapModel.textStyleModel;
+
+        // 添加透明文本 shape，仅用于触发布局和占位
+        group.add(new graphic.Text({
+            silent: true,
+            invisible: true,
+            style: createTextStyle(textStyleModel, {
+                x: position[0],
+                y: position[1],
+                // 自动适配方向和对齐规则，使布局逼近真实渲染
+                verticalAlign: textStyleModel.get('verticalAlign')
+                    || (orient === 'horizontal' ? 'middle' : (endsIndex === 0 ? 'bottom' : 'top') as TextVerticalAlign),
+                align: textStyleModel.get('align')
+                    || (orient === 'horizontal' ? (endsIndex === 0 ? 'bottom' : 'top') as TextAlign : 'center'),
+                text,
+                fill: 'transparent',
+                opacity: 0
+            })
+        }));
+    }
+
+    /**
+     * 仅在“估算模式”下，根据当前 layout 刷新元素的位置数据（不设置颜色等样
+     * 式）。
+     *
+     * 用于保障尺寸测量准确性。注意不会写入实际的 color, gradient 等样式。
+     */
+    private _updateViewForEstimate(group: graphic.Group, forSketch?: boolean) {
+        const visualMapModel = this.visualMapModel;
+        const dataExtent = visualMapModel.getExtent();
+        const shapes = this._shapes;
+
+        // 计算两个极值位置，便于估算整体长度
+        const outOfRangeHandleEnds = [0, visualMapModel.itemSize[1]];
+        // 若仅估算 sketch，则 handle 在极端边界；否则采用当前已有的 handle 区间
+        const inRangeHandleEnds = forSketch ? outOfRangeHandleEnds : this._handleEnds;
+
+        // 生成 inRange / outOfRange bar points 数据，但不设置真实样式，仅填形状
+        const visualInRange = this._createBarVisual(
+            this._dataInterval, dataExtent, inRangeHandleEnds, 'inRange'
+        );
+        const visualOutOfRange = this._createBarVisual(
+            dataExtent, dataExtent, outOfRangeHandleEnds, 'outOfRange'
+        );
+
+        // 只更改透明 shape 的几何区域，不做其他布局处理
+        shapes.outOfRange.setShape('points', visualOutOfRange.barPoints);
+
+        // 触发 handle 的同步位置调整
+        this._updateHandleForEstimate(group, inRangeHandleEnds, visualInRange);
+    }
+
+    /**
+     * 在 estimate 模式下同步更新 handles 的布局逻辑（位置、缩放、文本等），不改
+     * 变颜色样式。
+     *
+     * 此方法只处理 handle 及其 label 的物理几何属性，用于空间测算。
+     */
+    private _updateHandleForEstimate(group: graphic.Group, handleEnds: number[], visualInRange: BarVisual) {
+        if (!this._useHandle) {
+            return;
+        }
+
+        const shapes = this._shapes;
+        const visualMapModel = this.visualMapModel;
+        const handleThumbs = shapes.handleThumbs;
+        const handleLabels = shapes.handleLabels;
+        const itemSize = visualMapModel.itemSize;
+        const dataExtent = visualMapModel.getExtent();
+
+        each([0, 1], function (handleIndex) {
+            // 更新 handle 的 y 坐标，仅用于竖直方向定位，或者水平时 x 匹配
+            const handleThumb = handleThumbs[handleIndex];
+            handleThumb.y = handleEnds[handleIndex];
+
+            // 通过 handle 的位置反算出当前数值
+            const val = linearMap(handleEnds[handleIndex], [0, itemSize[1]], dataExtent, true);
+            // 获取 handle 对应的符号实际尺寸，使布局与缩放等比例相关
+            const symbolSize = this.getControllerVisual(val, 'symbolSize') as number;
+
+            handleThumb.scaleX = handleThumb.scaleY = symbolSize / itemSize[0];
+            handleThumb.x = itemSize[0] - symbolSize / 2;
+
+            // 根据变换后的位置，计算 label 的精确绘制点
+            const textPoint = graphic.applyTransform(
+                shapes.handleLabelPoints[handleIndex],
+                graphic.getTransform(handleThumb, group)
+            );
+
+            // 对于横向 visualMap，label 位置按主 bar 对齐方向偏移
+            if (this._orient === 'horizontal') {
+                const align = this._applyTransform('left', shapes.mainGroup);
+                const minimumOffset = align === 'left' || align === 'top'
+                    ? (itemSize[0] - symbolSize) / 2
+                    : (itemSize[0] - symbolSize) / -2;
+                textPoint[1] += minimumOffset;
+            }
+
+            // 更新 label 的 layout 信息，保持 estimate 态下 label 也能正确计入 bbox
+            handleLabels[handleIndex].setStyle({
+                x: textPoint[0],
+                y: textPoint[1],
+                text: visualMapModel.formatValueText(this._dataInterval[handleIndex]),
+                verticalAlign: 'middle',
+                align: this._orient === 'vertical' ? this._applyTransform(
+                    'left',
+                    shapes.mainGroup
+                ) as TextAlign : 'center'
+            });
+        }, this);
     }
 
 }

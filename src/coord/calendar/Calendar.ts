@@ -20,15 +20,17 @@
 import * as zrUtil from 'zrender/src/core/util';
 import * as layout from '../../util/layout';
 import * as numberUtil from '../../util/number';
-import BoundingRect, {RectLike} from 'zrender/src/core/BoundingRect';
+import BoundingRect, { RectLike } from 'zrender/src/core/BoundingRect';
 import CalendarModel from './CalendarModel';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
+import SeriesModel from '../../model/Series';
 import {
     LayoutOrient,
     ScaleDataValue,
     OptionDataValueDate,
     CoordinateSystemDataLayout,
+    ZRRectLike,
 } from '../../util/types';
 import { ParsedModelFinder, ParsedModelFinderKnown } from '../../util/model';
 import {
@@ -36,6 +38,19 @@ import {
 } from '../CoordinateSystem';
 import { expandOrShrinkRect } from '../../util/graphic';
 import { injectCoordSysByOption, simpleCoordSysInjectionProvider } from '../../core/CoordinateSystem';
+import {
+    LegendAvoidableCoordinateSystem,
+    LayoutLegendContext,
+    fillLegendGroupSpaceToMargin,
+    collectCoordLabelSeries,
+    calculateOuterBoundingRectWithLabels,
+    calculateRectExpansionMargin,
+    isMarginAllZero,
+    calculateSeriesLabelBoundingRects,
+    calculateSymbolRect,
+    calculateSeriesLabelOverflowMargin
+} from '../../util/autoLayout';
+import type CalendarView from '../../component/calendar/CalendarView';
 
 // (24*60*60*1000)
 const PROXIMATE_ONE_DAY = 86400000;
@@ -91,7 +106,7 @@ interface CalendarCellRect {
     bl: number[]
 }
 
-class Calendar implements CoordinateSystem, CoordinateSystemMaster {
+class Calendar implements CoordinateSystem, CoordinateSystemMaster, LegendAvoidableCoordinateSystem {
 
     static readonly dimensions = ['time', 'value'];
     static getDimensionsInfo() {
@@ -118,8 +133,14 @@ class Calendar implements CoordinateSystem, CoordinateSystemMaster {
 
     private _lineWidth: number;
 
+    private _ecModel: GlobalModel;
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    autoLayoutContext: LayoutLegendContext | undefined;
+
     constructor(calendarModel: CalendarModel, ecModel: GlobalModel, api: ExtensionAPI) {
         this._model = calendarModel;
+        this._ecModel = ecModel;
         this._update(ecModel, api);
     }
     // Required in createListFromData
@@ -219,6 +240,10 @@ class Calendar implements CoordinateSystem, CoordinateSystemMaster {
         const layoutParams = this._model.getBoxLayoutParams();
         const cellNumbers = this._orient === 'horizontal' ? [weeks, 7] : [7, weeks];
 
+        function cellSizeSpecified(cellSize: (number | 'auto')[], idx: number): cellSize is number[] {
+            return cellSize[idx] != null && cellSize[idx] !== 'auto';
+        }
+
         zrUtil.each([0, 1] as const, function (idx) {
             if (cellSizeSpecified(cellSize, idx)) {
                 layoutParams[whNames[idx]] = cellSize[idx] * cellNumbers[idx];
@@ -229,7 +254,16 @@ class Calendar implements CoordinateSystem, CoordinateSystemMaster {
             width: api.getWidth(),
             height: api.getHeight()
         };
-        const calendarRect = this._rect = layout.getLayoutRect(layoutParams, whGlobal);
+        this._rect = layout.getLayoutRect(layoutParams, whGlobal);
+        this._updateCellSize();
+    }
+
+    private _updateCellSize() {
+        const calendarRect = this._rect;
+        const weeks = this._rangeInfo.weeks || 1;
+        const whNames = ['width', 'height'] as const;
+        const cellSize = this._model.getCellSize().slice();
+        const cellNumbers = this._orient === 'horizontal' ? [weeks, 7] : [7, weeks];
 
         zrUtil.each([0, 1], function (idx) {
             if (!cellSizeSpecified(cellSize, idx)) {
@@ -246,6 +280,263 @@ class Calendar implements CoordinateSystem, CoordinateSystemMaster {
         this._sh = cellSize[1] as number;
     }
 
+    /** @implements LegendAvoidableCoordinateSystem */
+    getOuterBoundingRect(): BoundingRect | null {
+        return this.getRect();
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    applyAutoLayout(ecModel: GlobalModel, api: ExtensionAPI): void {
+        // 获取画布的整体宽高，作为后续布局的参考（全局画布尺寸）
+        const whGlobal = {
+            width: api.getWidth(),
+            height: api.getHeight()
+        };
+
+        // 获取日历组件的布局参数
+        const layoutParams = this._model.getBoxLayoutParams();
+
+        // 根据布局参数和全局尺寸计算日历本体的矩形区域
+        const calendarRect = this._rect = layout.getLayoutRect(layoutParams, whGlobal);
+
+        // 之后会动态修正 finalBoundingRect，使其包含日历和所有溢出元素（如标签等），用于智能布局
+        let finalBoundingRect: ZRRectLike;
+
+        // -------- 自动布局处理（需先于 adaptiveLayout逻辑） --------
+        // autoLayoutContext：如果启用自动布局（如图例避让等），相关上下文会被设置
+        if (this.autoLayoutContext != null) {
+            // 如果需要自动布局（如图例避让），须计算完整的外包围矩形（含所有标签等），
+            // 以指导图例等组件进行避让布局
+            if (this.autoLayoutContext.needLayout === true) {
+                // 计算包含所有日历标签的外包围矩形，便于 legend 避让
+                finalBoundingRect = this._calculateLabelBoundingRectForAutoLayout(api);
+
+                // 将 legend 组的空间和自动布局间隙叠加到 margin，上下文一同传递下去
+                fillLegendGroupSpaceToMargin(
+                    this.autoLayoutContext.group,
+                    api,
+                    finalBoundingRect,
+                    null,
+                    this.autoLayoutContext
+                );
+            }
+
+            // 配置里如果显式设置了 margin，则根据 margin 对 rect 和外包围矩形做边距调整
+            if (this.autoLayoutContext.margin != null) {
+                const contextMargin = this.autoLayoutContext.margin;
+                // 对日历实际布局做边距扩展/收缩
+                expandOrShrinkRect(calendarRect, contextMargin, true, true);
+                // 如果存在 finalBoundingRect 也一并处理
+                if (finalBoundingRect) {
+                    expandOrShrinkRect(finalBoundingRect, contextMargin, true, true);
+                }
+            }
+        }
+
+        // -------- 处理日历自身的 label（如星期、月份等文字）的溢出压缩 --------
+        if (this._model.get('adaptiveLayout')) {
+            // labelRefContainer 设置为当前完整画布（此处保证无论怎么扩展都在全局内计算出最终 margin）
+            const labelRefContainer = {
+                x: 0,
+                y: 0,
+                width: api.getWidth(),
+                height: api.getHeight()
+            } as ZRRectLike;
+
+            // 计算并应用日历自带的标签（如年、月、星期等）溢出扩展区
+            const labelOverflowMargin = this._calculateLabelOverflowMargin(api, labelRefContainer);
+            if (labelOverflowMargin) {
+                // 对calendarRect和最终包围矩形都做边距扩展
+                expandOrShrinkRect(calendarRect, labelOverflowMargin, true, true);
+                if (finalBoundingRect) {
+                    expandOrShrinkRect(finalBoundingRect, labelOverflowMargin, true, true);
+                }
+            }
+
+            // 计算系列（series）标签的溢出边距（如日历格子上的数据标签），同理处理
+            const seriesLabelOverflowMargin = this._calculateSeriesLabelOverflowMargin(labelRefContainer, api);
+            if (seriesLabelOverflowMargin) {
+                expandOrShrinkRect(calendarRect, seriesLabelOverflowMargin, true, true);
+                if (finalBoundingRect) {
+                    expandOrShrinkRect(finalBoundingRect, seriesLabelOverflowMargin, true, true);
+                }
+                // 边界变化后需要同步更新格子尺寸
+                this._updateCellSize();
+            }
+
+            // 如果 finalBoundingRect 存在，说明需要再次用当前最新扩展后的 rect 重新计算外包围
+            if (finalBoundingRect) {
+                finalBoundingRect = this._calculateLabelBoundingRectForAutoLayout(api);
+            }
+        }
+
+        // -------- 日历布局全部完成后，记录最终的包围盒，便于其它组件/业务引用 --------
+        if (this.autoLayoutContext?.needLayout === true) {
+            this.autoLayoutContext.finalBoundingRect = finalBoundingRect;
+        }
+
+        // 日历图本身由于容器矩形可能被多次扩展，所以需再次刷新内部格子尺寸
+        this._updateCellSize();
+    }
+
+    /**
+     * 获取包含日历本身和所有日历标签（如星期、月份、年等）的完整包围盒。
+     *
+     * @param api ExtensionAPI 实例，用于获取当前组件视图。
+     * @returns 返回包含日历和标签的包围矩形，如无法获取则返回基础日历区域（getOuterBoundingRect）。
+     */
+    private _getRectWithLabels(api: ExtensionAPI): BoundingRect | null {
+        // 尝试通过 CalendarView 的 getOuterBoundingRect 方法获取包含标签的外包围
+        const calendarView = api.getViewOfComponentModel(this._model) as CalendarView;
+        if (calendarView && calendarView.getOuterBoundingRect) {
+            return calendarView.getOuterBoundingRect(this._model, this._ecModel, api);
+        }
+
+        // 若未获取到视图或方法不存在，则退回只包含日历区域的基础包围盒
+        const baseRect = this.getOuterBoundingRect();
+        if (!baseRect) {
+            return null;
+        }
+        return baseRect;
+    }
+
+    /**
+     * 计算仅日历标签（如星期、月份、年份等）因溢出所需扩展的 margin。
+     *
+     * @param api ExtensionAPI 实例。
+     * @param refContainer 外部参考容器矩形（如整个画布）。
+     * @returns 返回所需的扩展边距数组 [top, right, bottom, left]；如无需扩展则返回 null。
+     */
+    private _calculateLabelOverflowMargin(
+        api: ExtensionAPI,
+        refContainer: RectLike
+    ): number[] | null {
+        // 获取包含标签的完整日历区域
+        const calendarRectWithLabels = this._getRectWithLabels(api);
+        if (!calendarRectWithLabels) {
+            return null;
+        }
+
+        // 计算标签的溢出边距
+        const margin = calculateRectExpansionMargin(
+            refContainer,
+            calendarRectWithLabels
+        );
+
+        // 如果没有实际发生压缩（margin 全为零），则返回 null
+        return isMarginAllZero(margin) ? null : margin;
+    }
+
+    /**
+     * 计算所有系列（series）标签在日历坐标系下的溢出扩展边距。
+     *
+     * @param refContainer 外部参考容器矩形。
+     * @returns 返回所需扩展的边距数组 [top, right, bottom, left]；如无需扩展返回 null。
+     */
+    private _calculateSeriesLabelOverflowMargin(
+        refContainer: RectLike,
+        api: ExtensionAPI
+    ): number[] | null {
+        const seriesList = collectCoordLabelSeries(this._ecModel, this);
+        if (seriesList.length === 0) {
+            return null;
+        }
+
+        const seriesLabelBoundingRects = this._calculateSeriesLabelBoundingRects(seriesList, api);
+        const seriesLabelOverflowMargin = calculateSeriesLabelOverflowMargin(
+            seriesLabelBoundingRects,
+            refContainer
+        );
+
+        return isMarginAllZero(seriesLabelOverflowMargin) ? null : seriesLabelOverflowMargin;
+    }
+
+    /**
+     * 针对 calendar 坐标系，批量计算所有系列标签的包围盒。
+     *
+     * @param seriesList 系列（SeriesModel）集合
+     * @param api ExtensionAPI 实例
+     * @returns 返回系列标签包围矩形数组，每一项包含 rect 与对齐信息
+     */
+    private _calculateSeriesLabelBoundingRects(seriesList: SeriesModel[], api: ExtensionAPI): Array<{
+        rect: BoundingRect;
+        textAlign: string;
+    }> {
+        const calendarCoord = this;
+        return calculateSeriesLabelBoundingRects(
+            seriesList,
+            api,
+            (seriesModel, data) => {
+                const items: Array<{
+                    dataIndex: number;
+                    point: number[];
+                    symbolRect: BoundingRect;
+                    labelText: string;
+                }> = [];
+
+                data.each((idx: number) => {
+                    // 获取当前数据项的实际数值
+                    const dataValue = data.getValues([calendarCoord.dimensions[0]], idx);
+                    // 计算该数据点在日历坐标上的实际像素点位置
+                    const point = calendarCoord.dataToPoint(dataValue);
+                    if (dataValue == null || !point || point.length < 2) {
+                        return;
+                    }
+
+                    // Create symbol bounding rect using unified function
+                    const symbolRect = calculateSymbolRect(seriesModel, data, idx, point, api);
+                    if (!symbolRect) {
+                        return;
+                    }
+
+                    const labelText = seriesModel.getFormattedLabel(idx, 'normal');
+                    if (labelText == null || labelText === '') {
+                        return;
+                    }
+
+                    items.push({
+                        dataIndex: idx,
+                        point: point,
+                        symbolRect: symbolRect,
+                        labelText: labelText
+                    });
+                });
+
+                return items;
+            }
+        );
+    }
+
+    /**
+     * 计算用于自动布局避让图例（legend）的最大外部包围盒。
+     *
+     * @param api ExtensionAPI 实例。
+     * @param refContainer 用于对齐比较的容器矩形。
+     * @returns 返回一个包含日历标签以及所有系列标签的完整区域。
+     */
+    private _calculateLabelBoundingRectForAutoLayout(
+        api: ExtensionAPI
+    ): RectLike {
+        const calendarRectWithLabels = this._getRectWithLabels(api);
+        if (!calendarRectWithLabels) {
+            return this.getRect();
+        }
+
+        const seriesList = collectCoordLabelSeries(this._ecModel, this);
+        if (seriesList.length === 0) {
+            return calendarRectWithLabels;
+        }
+
+        const seriesLabelBoundingRects = this._calculateSeriesLabelBoundingRects(seriesList, api);
+        if (seriesLabelBoundingRects.length === 0) {
+            return calendarRectWithLabels;
+        }
+
+        return calculateOuterBoundingRectWithLabels(
+            calendarRectWithLabels,
+            seriesLabelBoundingRects
+        );
+    }
 
     /**
      * Convert a time data(time, value) item to (x, y) point.
@@ -558,6 +849,10 @@ class Calendar implements CoordinateSystem, CoordinateSystemMaster {
                 coordSysProvider: simpleCoordSysInjectionProvider,
             });
         });
+        // 必须要在所有坐标系创建完成后才能应用自动布局。
+        calendarList.forEach(calendar => {
+            calendar.applyAutoLayout(ecModel, api);
+        });
         return calendarList;
     }
 }
@@ -569,8 +864,8 @@ function getCoordSys(finder: ParsedModelFinderKnown): Calendar {
     const coordSys = calendarModel
         ? calendarModel.coordinateSystem
         : seriesModel
-        ? seriesModel.coordinateSystem
-        : null;
+            ? seriesModel.coordinateSystem
+            : null;
 
     return coordSys as Calendar;
 }

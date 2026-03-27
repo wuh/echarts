@@ -26,11 +26,13 @@ import ComponentView from '../../view/Component';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
 import VisualMapModel from './VisualMapModel';
-import { VisualOptionUnit, ColorString } from '../../util/types';
+import { VisualOptionUnit, ColorString, ZRRectLike } from '../../util/types';
+import { graphic } from '../../echarts.all';
+import { AutoLayoutComponentView } from '../../util/autoLayout';
 
 type VisualState = VisualMapModel['stateList'][number];
 
-class VisualMapView extends ComponentView {
+class VisualMapView extends ComponentView implements AutoLayoutComponentView {
     static type = 'visualMap';
     type = VisualMapView.type;
 
@@ -41,6 +43,8 @@ class VisualMapView extends ComponentView {
     api: ExtensionAPI;
 
     visualMapModel: VisualMapModel;
+
+    _backgroundEl: graphic.Rect;
 
     init(ecModel: GlobalModel, api: ExtensionAPI) {
         this.ecModel = ecModel;
@@ -67,6 +71,16 @@ class VisualMapView extends ComponentView {
     }
 
     /**
+     * @override
+     * 子类必须覆盖此方法以实现尺寸估算
+     */
+    renderForEstimate(visualMapModel: VisualMapModel, ecModel: GlobalModel, api: ExtensionAPI): ZRRectLike {
+        // 子类必须覆盖此方法
+        return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+
+    /**
      * @protected
      */
     renderBackground(group: Group) {
@@ -74,7 +88,7 @@ class VisualMapView extends ComponentView {
         const padding = formatUtil.normalizeCssArray(visualMapModel.get('padding') || 0);
         const rect = group.getBoundingRect();
 
-        group.add(new Rect({
+        const _backgroundEl = this._backgroundEl = new Rect({
             z2: -1, // Lay background rect on the lowest layer.
             silent: true,
             shape: {
@@ -88,7 +102,9 @@ class VisualMapView extends ComponentView {
                 stroke: visualMapModel.get('borderColor'),
                 lineWidth: visualMapModel.get('borderWidth')
             }
-        }));
+        });
+
+        group.add(_backgroundEl);
     }
 
     /**

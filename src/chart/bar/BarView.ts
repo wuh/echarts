@@ -34,6 +34,7 @@ import {
 import { getECData } from '../../util/innerStore';
 import { setStatesStylesFromModel, toggleHoverEmphasis } from '../../util/states';
 import { setLabelStyle, getLabelStatesModels, setLabelValueAnimation, labelInner } from '../../label/labelStyle';
+import { BoundingRect } from 'zrender';
 import {throttle} from '../../util/throttle';
 import {createClipPath} from '../helper/createClipPathFromCoordSys';
 import Sausage from '../../util/shape/sausage';
@@ -69,6 +70,8 @@ import {createSectorCalculateTextPosition, SectorTextPosition, setSectorTextRota
 import { saveOldStyle } from '../../animation/basicTransition';
 import Element from 'zrender/src/Element';
 import { getSectorCornerRadius } from '../helper/sectorHelper';
+import { layout, calculateBarLayout, prepareBarLayoutContext, getBarDataValues } from '../../layout/barGrid';
+import type { SymbolRectProvider } from '../../util/autoLayout';
 
 const mathMax = Math.max;
 const mathMin = Math.min;
@@ -115,7 +118,7 @@ function getClipArea(coord: CoordSysOfBar, data: SeriesData) {
     return coordSysClipArea as PolarCoordArea | CartesianCoordArea;
 }
 
-class BarView extends ChartView {
+class BarView extends ChartView implements SymbolRectProvider {
     static type = 'bar' as const;
     type = BarView.type;
 
@@ -467,6 +470,84 @@ class BarView extends ChartView {
         this._backgroundEls = bgEls;
 
         this._data = data;
+    }
+
+    /** @implements SymbolRectProvider */
+    getSymbolRect(seriesModel: SeriesModel, dataIndex: number, ecModel: GlobalModel): BoundingRect | null {
+        // 获取系列数据和坐标系
+        const data = seriesModel.getData();
+        const coord = seriesModel.coordinateSystem;
+
+        // 无坐标系时不支持返回边界
+        if (!coord) {
+            return null;
+        }
+
+        // 当前数据项模型
+        const itemModel = data.getItemModel<BarDataItemOption>(dataIndex);
+
+        // 先尝试直接获取布局
+        const coordType = coord.type as 'cartesian2d' | 'polar';
+        let layout = getLayout[coordType](data, dataIndex, itemModel);
+
+        // 若布局无效，则尝试计算或估算（仅笛卡尔支持自动估算）
+        if (!layout || !isValidLayout[coordType](layout)) {
+            if (coord.type === 'cartesian2d') {
+                layout = this._estimateCartesianLayout(seriesModel as BarSeriesModel, data, dataIndex, ecModel);
+            }
+            // 极坐标暂不自动估算
+
+            // 二次兜底检查
+            if (!layout || !isValidLayout[coordType](layout)) {
+                return null;
+            }
+        }
+
+        // 笛卡尔坐标：以矩形方式返回柱子边界
+        if (coord.type === 'cartesian2d') {
+            const rectLayout = layout as RectLayout;
+            return new BoundingRect(
+                rectLayout.x,
+                rectLayout.y,
+                rectLayout.width,
+                rectLayout.height
+            );
+        }
+        // 极坐标：将当前扇形区域映射为近似矩形用于定位
+        else if (coord.type === 'polar') {
+            const sectorLayout = layout as SectorLayout;
+            // 极坐标近似矩形宽高用于标签计算，中心点基于平均角度
+            const width = sectorLayout.r - sectorLayout.r0;
+            const height = sectorLayout.r * (sectorLayout.endAngle - sectorLayout.startAngle);
+            return new BoundingRect(
+                sectorLayout.cx + sectorLayout.r0 * Math.cos((sectorLayout.startAngle + sectorLayout.endAngle) / 2),
+                sectorLayout.cy + sectorLayout.r0 * Math.sin((sectorLayout.startAngle + sectorLayout.endAngle) / 2),
+                width,
+                height);
+        }
+
+        // 其它坐标系返回null
+        return null;
+    }
+
+    /**
+     * 估算笛卡尔坐标系下的柱形图布局。
+     *
+     * 参考了 {@link layout} 的实现。
+     */
+    private _estimateCartesianLayout(
+        seriesModel: BarSeriesModel,
+        data: SeriesData,
+        dataIndex: number,
+        ecModel: GlobalModel
+    ): RectLayout | null {
+        layout('bar', ecModel);
+        const layoutContext = prepareBarLayoutContext(seriesModel, data, true);
+        if (!layoutContext) {
+            return null;
+        }
+        const dataValues = getBarDataValues(layoutContext, dataIndex);
+        return calculateBarLayout(layoutContext, dataValues);
     }
 
     private _renderLarge(seriesModel: BarSeriesModel, ecModel: GlobalModel, api: ExtensionAPI): void {
@@ -1041,8 +1122,8 @@ function updateStyle(
             )
         )
         : (isHorizontalOrRadial
-            ? ((layout as RectLayout).height >= 0 ? 'bottom' : 'top')
-            : ((layout as RectLayout).width >= 0 ? 'right' : 'left'));
+            ? getLabelPositionForHorizontal(layout as RectLayout, seriesModel.coordinateSystem)
+            : getLabelPositionForVertical(layout as RectLayout, seriesModel.coordinateSystem));
 
     const labelStatesModels = getLabelStatesModels(itemModel);
 
@@ -1286,6 +1367,24 @@ function createBackgroundEl(
         silent: true,
         z2: 0
     });
+}
+
+function getLabelPositionForHorizontal(layout: RectLayout, coordSys: CoordSysOfBar): 'top' | 'bottom' {
+    if (layout.height === 0) {
+        // For zero height, determine position based on axis inverse status
+        const valueAxis = (coordSys as Cartesian2D).getOtherAxis((coordSys as Cartesian2D).getBaseAxis());
+        return valueAxis.inverse ? 'bottom' : 'top';
+    }
+    return layout.height > 0 ? 'bottom' : 'top';
+}
+
+function getLabelPositionForVertical(layout: RectLayout, coordSys: CoordSysOfBar): 'left' | 'right' {
+    if (layout.width === 0) {
+        // For zero width, determine position based on axis inverse status
+        const valueAxis = (coordSys as Cartesian2D).getOtherAxis((coordSys as Cartesian2D).getBaseAxis());
+        return valueAxis.inverse ? 'left' : 'right';
+    }
+    return layout.width >= 0 ? 'right' : 'left';
 }
 
 export default BarView;

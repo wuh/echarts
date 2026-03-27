@@ -34,6 +34,13 @@ import ZRImage from 'zrender/src/graphic/Image';
 import { extend, isFunction, isString, isNumber, each } from 'zrender/src/core/util';
 import {setCommonECData} from '../../util/innerStore';
 import { normalizeArcAngles } from 'zrender/src/core/PathProxy';
+import {
+    LegendAvoidableSeriesView,
+    LayoutLegendContext,
+    applyMarginToCircularLayout,
+    calculateCircularBoundingRect
+} from '../../util/autoLayout';
+import BoundingRect from 'zrender/lib/core/BoundingRect';
 
 type ECSymbol = ReturnType<typeof createSymbol>;
 
@@ -73,7 +80,7 @@ function formatLabel(value: number, labelFormatter: string | ((value: number) =>
     return label;
 }
 
-class GaugeView extends ChartView {
+class GaugeView extends ChartView implements LegendAvoidableSeriesView {
     static type = 'gauge' as const;
     type = GaugeView.type;
 
@@ -83,6 +90,9 @@ class GaugeView extends ChartView {
     private _titleEls: graphic.Text[];
     private _detailEls: graphic.Text[];
 
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext | undefined;
+
     render(seriesModel: GaugeSeriesModel, ecModel: GlobalModel, api: ExtensionAPI) {
 
         this.group.removeAll();
@@ -90,11 +100,42 @@ class GaugeView extends ChartView {
         const colorList = seriesModel.get(['axisLine', 'lineStyle', 'color']);
         const posInfo = parsePosition(seriesModel, api);
 
+        // 处理自动布局上下文中的边距压缩
+        const margin = this.autoLayoutContext?.margin;
+        if (margin != null) {
+            // 使用公共函数将margin应用到圆形布局中
+            const adjusted = applyMarginToCircularLayout(
+                margin,
+                posInfo.cx,
+                posInfo.cy,
+                posInfo.r,
+                0  // gauge 没有内半径
+            );
+            posInfo.cx = adjusted.cx;
+            posInfo.cy = adjusted.cy;
+            posInfo.r = adjusted.r;
+        }
+
         this._renderMain(
             seriesModel, ecModel, api, colorList, posInfo
         );
 
         this._data = seriesModel.getData();
+    }
+
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: GaugeSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: any
+    ): BoundingRect {
+        const posInfo = parsePosition(seriesModel, api);
+        return calculateCircularBoundingRect(
+            posInfo.cx,
+            posInfo.cy,
+            posInfo.r
+        );
     }
 
     dispose() {}
@@ -529,6 +570,7 @@ class GaugeView extends ChartView {
                 const focus = emphasisModel.get('focus');
                 const blurScope = emphasisModel.get('blurScope');
                 const emphasisDisabled = emphasisModel.get('disabled');
+                const autoColor = getColor(linearMap(data.get(valueDim, idx) as number, valueExtent, [0, 1], true));
                 if (showPointer) {
                     const pointer = data.getItemGraphicEl(idx) as ECSymbol;
                     const symbolStyle = data.getItemVisual(idx, 'style');
@@ -550,9 +592,7 @@ class GaugeView extends ChartView {
 
 
                     if (pointer.style.fill === 'auto') {
-                        pointer.setStyle('fill', getColor(
-                            linearMap(data.get(valueDim, idx) as number, valueExtent, [0, 1], true)
-                        ));
+                        pointer.setStyle('fill', autoColor);
                     }
 
                     (pointer as ECElement).z2EmphasisLift = 0;
@@ -564,6 +604,9 @@ class GaugeView extends ChartView {
                     const progress = progressList[idx];
                     progress.useStyle(data.getItemVisual(idx, 'style'));
                     progress.setStyle(itemModel.getModel(['progress', 'itemStyle']).getItemStyle());
+                    if (progress.style.fill === 'auto') {
+                        progress.setStyle('fill', autoColor);
+                    }
                     (progress as ECElement).z2EmphasisLift = 0;
                     setStatesStylesFromModel(progress, itemModel);
                     toggleHoverEmphasis(progress, focus, blurScope, emphasisDisabled);

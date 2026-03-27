@@ -45,6 +45,13 @@ export interface MatrixOption extends ComponentOption, BoxLayoutOptionMixin {
     borderZ2?: number;
     tooltip?: CommonTooltipOption<MatrixTooltipFormatterParams>;
 
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean;
+
     // PENDING: do we need to support other states, i.e., `emphasis`, `blur`, `select`?
 }
 
@@ -169,7 +176,7 @@ export interface MatrixDimensionCellOption extends MatrixBaseCellOption {
     // Do not use type `OrdinalRawValue` here. Number input is forbiden due to the possible confusion.
     // e.g., if `matrix.x.data: [1, 2, 3]` is allowed, then querying `coord: [1, null]` will actually get
     // the second column, since number represents the index (i.e. `MatrixXYLocator` or `OrdinalNumber`).
-    value?: string;
+    value?: string | NullUndefined;
     // column width (for x dimension) or row height (for y dimension).
     // If not specified (null/undefined), auto calculate it.
     // Only available on leaves, to avoid unnecessary complex.
@@ -276,6 +283,7 @@ const defaultMatrixOption: MatrixOption = {
         borderColor: tokens.color.axisLine,
         borderWidth: 1,
     },
+    adaptiveLayout: false,
 };
 
 

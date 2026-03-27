@@ -57,6 +57,7 @@ export {install as VisualMapComponent} from '../component/visualMap/install';
 export {install as VisualMapContinuousComponent} from '../component/visualMap/installVisualMapContinuous';
 
 export {install as VisualMapPiecewiseComponent} from '../component/visualMap/installVisualMapPiecewise';
+export {install as VisualMapScrollPiecewiseComponent} from '../component/visualMap/installVisualMapScrollablePiecewise';
 
 export {install as ThumbnailComponent} from '../component/thumbnail/install';
 

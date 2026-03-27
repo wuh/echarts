@@ -34,6 +34,10 @@ import { getECData } from '../../util/innerStore';
 import { getVisualFromData } from '../../visual/helper';
 import { ZRColor } from '../../util/types';
 import SeriesDimensionDefine from '../../data/SeriesDimensionDefine';
+import { BoundingRect } from 'zrender';
+import { getLabelStatesModels } from '../../label/labelStyle';
+import * as symbolUtil from '../../util/symbol';
+import { calculateLabelBoundingRectFromPosition, calculateSymbolRectFromParams } from '../../util/autoLayout';
 
 function updateMarkerLayout(
     mpData: SeriesData<MarkPointModel>,
@@ -97,6 +101,128 @@ class MarkPointView extends MarkerView {
     type = MarkPointView.type;
 
     markerGroupMap: HashMap<SymbolDraw>;
+
+    /**
+     * 计算 markPoint 标签的边界矩形，用于自动布局。
+     */
+    getLabelBoundingRect(
+        seriesModel: SeriesModel,
+        mpModel: MarkPointModel,
+        api: ExtensionAPI
+    ): Array<{ rect: BoundingRect; textAlign: string }> {
+        const result: Array<{ rect: BoundingRect; textAlign: string }> = [];
+
+        // 获取全局的标签(label)配置。优先级最低，后续单个数据项可覆盖。
+        const globalLabelStatesModels = getLabelStatesModels(mpModel);
+        const globalLabelModel = globalLabelStatesModels.normal;
+
+        // 检查系列是否存在坐标系。markPoint 必须依赖坐标系才能计算布局，否则直接返回空结果。
+        const coordSys = seriesModel.coordinateSystem;
+        if (!coordSys) {
+            return result;
+        }
+
+        // 生成 markPoint 数据集（mpData），用于后续布局及标签计算
+        const mpData = createData(coordSys, seriesModel, mpModel);
+
+        // 暂时将新的数据集 mpData 绑定到 mpModel，以便 getFormattedLabel 能查询到最新数据
+        const originalData = mpModel.getData();
+        mpModel.setData(mpData);
+
+        // 计算 markPoint 各点的可视化布局（像素坐标），为标签布局做准备
+        updateMarkerLayout(mpData, seriesModel, api);
+
+        mpData.each(function (idx: number) {
+            // 注释：标签配置优先级处理，先获取全局配置，后检测数据项上是否有自定义
+            const itemModel = mpData.getItemModel<MarkPointDataItemOption>(idx);
+            let labelModel = globalLabelModel;
+
+            // 如果数据项有自定义配置（通常为单个点的特殊需求），则使用该配置覆盖全局
+            if (mpData.hasItemOption) {
+                const itemLabelStatesModels = getLabelStatesModels(itemModel);
+                const itemLabelModel = itemLabelStatesModels.normal;
+
+                // 如果“显示”、“位置”、“距离”、“字号”任一被重写，则认为数据项有独立标签需求
+                if (itemLabelModel.get('show') !== undefined
+                    || itemLabelModel.get('position') !== undefined
+                    || itemLabelModel.get('distance') !== undefined
+                    || itemLabelModel.get('fontSize') !== undefined) {
+                    labelModel = itemLabelModel;
+                }
+            }
+
+            // 标签非显示状态直接跳过，减少无用计算（如默认配置 'show': false 时）
+            if (!labelModel.get('show')) {
+                return;
+            }
+
+            // 只处理“非 inside”标签：在图形外部才可能对自动布局产生影响
+            const position = labelModel.get('position') || 'inside';
+            if (position === 'inside') {
+                return;
+            }
+
+            // 布局点坐标检查，避免数据异常导致后续报错
+            const point = mpData.getItemLayout(idx);
+            if (!point || point.length < 2) {
+                return;
+            }
+
+            // 优先获取数据项上符号类型和尺寸，没有则回退到全局 markPoint 配置
+            let symbol = itemModel.getShallow('symbol');
+            let symbolSize = itemModel.getShallow('symbolSize');
+
+            if (symbol == null) {
+                symbol = mpModel.get('symbol');
+            }
+            if (symbolSize == null) {
+                symbolSize = mpModel.get('symbolSize');
+            }
+
+            // 支持 symbolSize 配置为回调函数的场景，动态决定当前点尺寸
+            if (isFunction(symbolSize)) {
+                const rawIdx = mpModel.getRawValue(idx);
+                const dataParams = mpModel.getDataParams(idx);
+                symbolSize = symbolSize(rawIdx, dataParams);
+            }
+
+            // 当图形类型为 'none' 时不应布局标签，直接跳过
+            if (symbol === 'none') {
+                return;
+            }
+
+            // 将 symbolSize 统一处理为 [width, height] 形式，便于后续通用计算
+            const normalizedSymbolSize = symbolUtil.normalizeSymbolSize(symbolSize as number | number[]);
+
+            // 基于符号、点坐标和尺寸构造当前点的“符号参考包围盒”（供标签偏移定位参考）
+            const symbolRect = calculateSymbolRectFromParams(symbol as string, point, normalizedSymbolSize);
+
+            // 获取格式化后标签文字，若为空则不参与布局
+            const labelText = mpModel.getFormattedLabel(idx, 'normal');
+            if (labelText == null || labelText === '') {
+                return;
+            }
+
+            // 结合标签位置、参考矩形以及 labelModel，准确计算本标签包围盒和对齐方式
+            const labelRect = calculateLabelBoundingRectFromPosition(
+                String(position),        // 标签放置的位置类型（如 'top', 'left'）
+                symbolRect,             // 符号参考矩形，为标签定位提供参考点
+                labelModel,             // 标签配置模型（决定字体、距离等参数）
+                labelText               // 文本内容
+            );
+
+            // 结果入队，仅返回有效的 labelRect
+            if (labelRect) {
+                result.push(labelRect);
+            }
+        });
+
+        // 恢复 mpModel 的数据引用，保证外部逻辑不受影响
+        mpModel.setData(originalData);
+
+        // 返回所有能够被用于自动避让的 label 边界及对齐类型
+        return result;
+    }
 
     updateTransform(markPointModel: MarkPointModel, ecModel: GlobalModel, api: ExtensionAPI) {
         ecModel.eachSeries(function (seriesModel) {

@@ -19,7 +19,10 @@
 
 
 import ComponentModel from '../../model/Component';
-import { ComponentOption, BoxLayoutOptionMixin, ZRColor, ShadowOptionMixin, NullUndefined } from '../../util/types';
+import {
+    ComponentOption, BoxLayoutOptionMixin, ZRColor, ShadowOptionMixin, NullUndefined,
+    ComponentOnCalendarOptionMixin, ComponentOnMatrixOptionMixin
+} from '../../util/types';
 import Grid from './Grid';
 import { CoordinateSystemHostModel } from '../CoordinateSystem';
 import type GlobalModel from '../../model/Global';
@@ -31,8 +34,9 @@ import tokens from '../../visual/tokens';
 export const OUTER_BOUNDS_DEFAULT = {left: 0, right: 0, top: 0, bottom: 0};
 export const OUTER_BOUNDS_CLAMP_DEFAULT = ['25%', '25%'];
 
-export interface GridOption
-    extends ComponentOption, BoxLayoutOptionMixin, ShadowOptionMixin {
+export interface GridOption extends ComponentOption,
+    ComponentOnCalendarOptionMixin, ComponentOnMatrixOptionMixin,
+    BoxLayoutOptionMixin, ShadowOptionMixin {
 
     mainType?: 'grid';
 
@@ -44,6 +48,12 @@ export interface GridOption
      * It works for most case but it does not strictly contain all labels in some cases.
      */
     containLabel?: boolean;
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean;
     /**
      * Define a constrains rect.
      * Axis lines is firstly laid out based on the rect defined by `grid.left/right/top/bottom/width/height`.
@@ -127,6 +137,7 @@ class GridModel extends ComponentModel<GridOption> implements CoordinateSystemHo
         bottom: 80,
         // If grid size contain label
         containLabel: false,
+        adaptiveLayout: false,
         outerBoundsMode: 'auto',
         outerBounds: OUTER_BOUNDS_DEFAULT,
         outerBoundsContain: 'all',

@@ -33,7 +33,7 @@ import {
 
 const RADIAN = Math.PI / 180;
 
-interface LabelLayout {
+export interface LabelLayout {
     label: ZRText
     labelLine: Polyline
     position: PieSeriesOption['label']['position']
@@ -348,7 +348,7 @@ function isPositionCenter(sectorShape: LabelLayout) {
 
 export default function pieLabelLayout(
     seriesModel: PieSeriesModel
-) {
+): LabelLayout[] {
     const data = seriesModel.getData();
     const labelLayoutList: LabelLayout[] = [];
     let cx;
@@ -591,4 +591,5 @@ export default function pieLabelLayout(
             }
         }
     }
+    return labelLayoutList;
 }

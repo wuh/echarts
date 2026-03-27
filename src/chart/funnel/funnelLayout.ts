@@ -18,6 +18,7 @@
 */
 
 import * as layout from '../../util/layout';
+import { expandOrShrinkRect } from '../../util/graphic';
 import {parsePercent, linearMap} from '../../util/number';
 import FunnelSeriesModel, { FunnelSeriesOption, FunnelDataItemOption } from './FunnelSeries';
 import ExtensionAPI from '../../core/ExtensionAPI';
@@ -240,147 +241,159 @@ function labelLayout(data: SeriesData) {
 
 export default function funnelLayout(ecModel: GlobalModel, api: ExtensionAPI) {
     ecModel.eachSeriesByType('funnel', function (seriesModel: FunnelSeriesModel) {
-        const data = seriesModel.getData();
-        const valueDim = data.mapDimension('value');
-        const sort = seriesModel.get('sort');
+        applyFunnelLayout(seriesModel, api);
+    });
+}
 
-        const layoutRef = layout.createBoxLayoutReference(seriesModel, api);
-        const viewRect = layout.getLayoutRect(seriesModel.getBoxLayoutParams(), layoutRef.refContainer);
+/**
+ * 为单个漏斗系列应用布局，可选应用margin压缩
+ */
+export function applyFunnelLayout(seriesModel: FunnelSeriesModel, api: ExtensionAPI, margin?: number[]) {
+    const data = seriesModel.getData();
+    const valueDim = data.mapDimension('value');
+    const sort = seriesModel.get('sort');
 
-        const orient = seriesModel.get('orient');
-        const viewWidth = viewRect.width;
-        const viewHeight = viewRect.height;
-        let indices = getSortedIndices(data, sort);
-        let x = viewRect.x;
-        let y = viewRect.y;
+    const layoutRef = layout.createBoxLayoutReference(seriesModel, api);
+    const viewRect = layout.getLayoutRect(seriesModel.getBoxLayoutParams(), layoutRef.refContainer);
 
-        const sizeExtent = orient === 'horizontal' ? [
-            parsePercent(seriesModel.get('minSize'), viewHeight),
-            parsePercent(seriesModel.get('maxSize'), viewHeight)
-        ] : [
-                parsePercent(seriesModel.get('minSize'), viewWidth),
-                parsePercent(seriesModel.get('maxSize'), viewWidth)
-            ];
-        const dataExtent = data.getDataExtent(valueDim);
-        let min = seriesModel.get('min');
-        let max = seriesModel.get('max');
-        if (min == null) {
-            min = Math.min(dataExtent[0], 0);
-        }
-        if (max == null) {
-            max = dataExtent[1];
-        }
+    // 应用margin压缩
+    if (margin) {
+        expandOrShrinkRect(viewRect, margin, true, true);
+    }
 
-        const funnelAlign = seriesModel.get('funnelAlign');
-        let gap = seriesModel.get('gap');
-        const viewSize = orient === 'horizontal' ? viewWidth : viewHeight;
-        let itemSize = (viewSize - gap * (data.count() - 1)) / data.count();
+    const orient = seriesModel.get('orient');
+    const viewWidth = viewRect.width;
+    const viewHeight = viewRect.height;
+    let indices = getSortedIndices(data, sort);
+    let x = viewRect.x;
+    let y = viewRect.y;
 
-        const getLinePoints = function (idx: number, offset: number) {
-            // End point index is data.count() and we assign it 0
-            if (orient === 'horizontal') {
-                const val = data.get(valueDim, idx) as number || 0;
-                const itemHeight = linearMap(val, [min, max], sizeExtent, true);
-                let y0;
-                switch (funnelAlign) {
-                    case 'top':
-                        y0 = y;
-                        break;
-                    case 'center':
-                        y0 = y + (viewHeight - itemHeight) / 2;
-                        break;
-                    case 'bottom':
-                        y0 = y + (viewHeight - itemHeight);
-                        break;
-                }
+    const sizeExtent = orient === 'horizontal' ? [
+        parsePercent(seriesModel.get('minSize'), viewHeight),
+        parsePercent(seriesModel.get('maxSize'), viewHeight)
+    ] : [
+            parsePercent(seriesModel.get('minSize'), viewWidth),
+            parsePercent(seriesModel.get('maxSize'), viewWidth)
+        ];
+    const dataExtent = data.getDataExtent(valueDim);
+    let min = seriesModel.get('min');
+    let max = seriesModel.get('max');
+    if (min == null) {
+        min = Math.min(dataExtent[0], 0);
+    }
+    if (max == null) {
+        max = dataExtent[1];
+    }
 
-                return [
-                    [offset, y0],
-                    [offset, y0 + itemHeight]
-                ];
-            }
+    const funnelAlign = seriesModel.get('funnelAlign');
+    let gap = seriesModel.get('gap');
+    const viewSize = orient === 'horizontal' ? viewWidth : viewHeight;
+    let itemSize = (viewSize - gap * (data.count() - 1)) / data.count();
+
+    const getLinePoints = function (idx: number, offset: number) {
+        // End point index is data.count() and we assign it 0
+        if (orient === 'horizontal') {
             const val = data.get(valueDim, idx) as number || 0;
-            const itemWidth = linearMap(val, [min, max], sizeExtent, true);
-            let x0;
+            const itemHeight = linearMap(val, [min, max], sizeExtent, true);
+            let y0;
             switch (funnelAlign) {
-                case 'left':
-                    x0 = x;
+                case 'top':
+                    y0 = y;
                     break;
                 case 'center':
-                    x0 = x + (viewWidth - itemWidth) / 2;
+                    y0 = y + (viewHeight - itemHeight) / 2;
                     break;
-                case 'right':
-                    x0 = x + viewWidth - itemWidth;
+                case 'bottom':
+                    y0 = y + (viewHeight - itemHeight);
                     break;
             }
+
             return [
-                [x0, offset],
-                [x0 + itemWidth, offset]
+                [offset, y0],
+                [offset, y0 + itemHeight]
             ];
-        };
+        }
+        const val = data.get(valueDim, idx) as number || 0;
+        const itemWidth = linearMap(val, [min, max], sizeExtent, true);
+        let x0;
+        switch (funnelAlign) {
+            case 'left':
+                x0 = x;
+                break;
+            case 'center':
+                x0 = x + (viewWidth - itemWidth) / 2;
+                break;
+            case 'right':
+                x0 = x + viewWidth - itemWidth;
+                break;
+        }
+        return [
+            [x0, offset],
+            [x0 + itemWidth, offset]
+        ];
+    };
 
-        if (sort === 'ascending') {
-            // From bottom to top
-            itemSize = -itemSize;
-            gap = -gap;
-            if (orient === 'horizontal') {
-                x += viewWidth;
+    if (sort === 'ascending') {
+        // From bottom to top
+        itemSize = -itemSize;
+        gap = -gap;
+        if (orient === 'horizontal') {
+            x += viewWidth;
+        }
+        else {
+            y += viewHeight;
+        }
+        indices = indices.reverse();
+    }
+
+    for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i];
+        const nextIdx = indices[i + 1];
+        const itemModel = data.getItemModel<FunnelDataItemOption>(idx);
+
+        if (orient === 'horizontal') {
+            let width = itemModel.get(['itemStyle', 'width']);
+            if (width == null) {
+                width = itemSize;
             }
             else {
-                y += viewHeight;
+                width = parsePercent(width, viewWidth);
+                if (sort === 'ascending') {
+                    width = -width;
+                }
             }
-            indices = indices.reverse();
+
+            const start = getLinePoints(idx, x);
+            const end = getLinePoints(nextIdx, x + width);
+
+            x += width + gap;
+
+            data.setItemLayout(idx, {
+                points: start.concat(end.slice().reverse())
+            });
         }
-
-        for (let i = 0; i < indices.length; i++) {
-            const idx = indices[i];
-            const nextIdx = indices[i + 1];
-            const itemModel = data.getItemModel<FunnelDataItemOption>(idx);
-
-            if (orient === 'horizontal') {
-                let width = itemModel.get(['itemStyle', 'width']);
-                if (width == null) {
-                    width = itemSize;
-                }
-                else {
-                    width = parsePercent(width, viewWidth);
-                    if (sort === 'ascending') {
-                        width = -width;
-                    }
-                }
-
-                const start = getLinePoints(idx, x);
-                const end = getLinePoints(nextIdx, x + width);
-
-                x += width + gap;
-
-                data.setItemLayout(idx, {
-                    points: start.concat(end.slice().reverse())
-                });
+        else {
+            let height = itemModel.get(['itemStyle', 'height']);
+            if (height == null) {
+                height = itemSize;
             }
             else {
-                let height = itemModel.get(['itemStyle', 'height']);
-                if (height == null) {
-                    height = itemSize;
+                height = parsePercent(height, viewHeight);
+                if (sort === 'ascending') {
+                    height = -height;
                 }
-                else {
-                    height = parsePercent(height, viewHeight);
-                    if (sort === 'ascending') {
-                        height = -height;
-                    }
-                }
-
-                const start = getLinePoints(idx, y);
-                const end = getLinePoints(nextIdx, y + height);
-
-                y += height + gap;
-
-                data.setItemLayout(idx, {
-                    points: start.concat(end.slice().reverse())
-                });
             }
-        }
 
-        labelLayout(data);
-    });
+            const start = getLinePoints(idx, y);
+            const end = getLinePoints(nextIdx, y + height);
+
+            y += height + gap;
+
+            data.setItemLayout(idx, {
+                points: start.concat(end.slice().reverse())
+            });
+        }
+    }
+
+    labelLayout(data);
 }

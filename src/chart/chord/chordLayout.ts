@@ -33,7 +33,7 @@ export default function chordCircularLayout(ecModel: GlobalModel, api: Extension
     });
 }
 
-function chordLayout(seriesModel: ChordSeriesModel, api: ExtensionAPI) {
+export function chordLayout(seriesModel: ChordSeriesModel, api: ExtensionAPI, margin?: number[]) {
     const nodeData = seriesModel.getData();
     const nodeGraph = nodeData.graph;
     const edgeData = seriesModel.getEdgeData();
@@ -43,10 +43,17 @@ function chordLayout(seriesModel: ChordSeriesModel, api: ExtensionAPI) {
         return;
     }
 
-    const { cx, cy, r, r0 } = getCircleLayout(
+    const circleLayout = getCircleLayout(
         seriesModel as unknown as SeriesModel<CircleLayoutOptionMixin & SeriesOption<unknown>>,
         api
     );
+    let { cx, cy, r } = circleLayout;
+    const r0 = circleLayout.r0;
+    if (margin) {
+        cx += (margin[3] - margin[1]) / 2;
+        cy += (margin[0] - margin[2]) / 2;
+        r -= Math.max((margin[0] + margin[2]) / 2, (margin[1] + margin[3]) / 2);
+    }
 
     let padAngle = Math.max((seriesModel.get('padAngle') || 0) * RADIAN, 0);
     let minAngle = Math.max((seriesModel.get('minAngle') || 0) * RADIAN, 0);

@@ -123,7 +123,7 @@ export interface AxisBaseOptionCommon extends ComponentOption,
         zigzagAmplitude?: number;
         zigzagMinSpan?: number;
         zigzagMaxSpan?: number;
-        zigzagZ: number;
+        zigzagZ?: number;
         expandOnClick?: boolean;
     };
     breakLabelLayout?: {
@@ -300,6 +300,13 @@ interface AxisLabelBaseOption extends LabelCommonOption<AxisLabelBaseOptionNuanc
     // Whether axisLabel is inside the grid or outside the grid.
     inside?: boolean,
     rotate?: number,
+    /**
+     * 坐标轴标签的自适应布局模式。
+     *
+     * - 'rotate': 自动旋转标签，依次旋转45度、90度，旋转90度后仍放不下则使用间隔方式。
+     * - 'wrap': 换行模式，标签文本放不下时自动换行。
+     */
+    layoutMode?: 'rotate' | 'wrap',
     // true | false | null/undefined (auto)
     showMinLabel?: boolean,
     // true | false | null/undefined (auto)

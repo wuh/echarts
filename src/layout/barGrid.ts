@@ -27,6 +27,8 @@ import GlobalModel from '../model/Global';
 import type Cartesian2D from '../coord/cartesian/Cartesian2D';
 import { StageHandler, Dictionary } from '../util/types';
 import { createFloat32Array } from '../util/vendor';
+import SeriesData from '../data/SeriesData';
+import DataStore from '../data/DataStore';
 
 const STACK_PREFIX = '__ec_stack_';
 
@@ -440,6 +442,182 @@ function retrieveColumnLayout(
 }
 export {retrieveColumnLayout};
 
+export interface BarLayoutResult {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface BarLayoutContext {
+    cartesian: Cartesian2D;
+    baseAxis: Axis2D;
+    valueAxis: Axis2D;
+    valueDimIdx: number;
+    baseDimIdx: number;
+    stackedDimIdx: number | null;
+    stacked: boolean;
+    isValueAxisH: boolean;
+    barMinHeight: number;
+    valueAxisStart: number;
+    columnWidth: number;
+    columnOffset: number;
+    store: DataStore;
+}
+
+export interface BarDataValues {
+    value: number;
+    baseValue: number;
+    stackStartValue: number | undefined;
+}
+
+/**
+ * Prepare the layout context for bar chart calculation.
+ * This function extracts common setup logic shared by BarView and createProgressiveLayout.
+ */
+export function prepareBarLayoutContext(
+    seriesModel: BarSeriesModel,
+    data: SeriesData,
+    checkLayoutParams?: boolean
+): BarLayoutContext | null {
+    const cartesian = seriesModel.coordinateSystem as Cartesian2D;
+    if (!cartesian) {
+        return null;
+    }
+
+    const baseAxis = cartesian.getBaseAxis();
+    const valueAxis = cartesian.getOtherAxis(baseAxis);
+    const valueDimIdx = data.getDimensionIndex(data.mapDimension(valueAxis.dim));
+    const baseDimIdx = data.getDimensionIndex(data.mapDimension(baseAxis.dim));
+    const valueDim = data.mapDimension(valueAxis.dim);
+    const stackResultDim = data.getCalculationInfo('stackResultDimension');
+    const stacked = isDimensionStacked(data, valueDim) && !!data.getCalculationInfo('stackedOnSeries');
+    const isValueAxisH = valueAxis.isHorizontal();
+    const barMinHeight = seriesModel.get('barMinHeight') || 0;
+    const stackedDimIdx = stackResultDim ? data.getDimensionIndex(stackResultDim) : null;
+    const valueAxisStart = getValueAxisStart(baseAxis, valueAxis);
+
+    // Layout info.
+    const columnWidth = data.getLayout('size');
+    const columnOffset = data.getLayout('offset');
+
+    // If checkLayoutParams is true, validate layout parameters (used by BarView)
+    if (checkLayoutParams && (columnWidth == null || columnOffset == null)) {
+        return null;
+    }
+
+    const store = data.getStore();
+
+    return {
+        cartesian,
+        baseAxis,
+        valueAxis,
+        valueDimIdx,
+        baseDimIdx,
+        stackedDimIdx,
+        stacked,
+        isValueAxisH,
+        barMinHeight,
+        valueAxisStart,
+        columnWidth: columnWidth as number,
+        columnOffset: columnOffset as number,
+        store
+    };
+}
+
+/**
+ * Get data values (value, baseValue, stackStartValue) for a specific data index.
+ * This function extracts common data retrieval logic shared by BarView and createProgressiveLayout.
+ */
+export function getBarDataValues(
+    context: BarLayoutContext,
+    dataIndex: number
+): BarDataValues {
+    const { store, stacked, stackedDimIdx, valueDimIdx, baseDimIdx } = context;
+
+    const value = store.get(stacked && stackedDimIdx != null ? stackedDimIdx : valueDimIdx, dataIndex) as number;
+    const baseValue = store.get(baseDimIdx, dataIndex) as number;
+
+    let stackStartValue: number | undefined;
+    // Because of the barMinHeight, we can not use the value in
+    // stackResultDimension directly.
+    if (stacked) {
+        stackStartValue = +value - (store.get(valueDimIdx, dataIndex) as number);
+    }
+
+    return {
+        value,
+        baseValue,
+        stackStartValue
+    };
+}
+
+/**
+ * Calculate the layout (x, y, width, height) for a single bar.
+ * This function is shared by both BarView and createProgressiveLayout.
+ */
+export function calculateBarLayout(
+    context: BarLayoutContext,
+    dataValues: BarDataValues
+): BarLayoutResult {
+    const {
+        cartesian,
+        valueAxisStart,
+        columnWidth,
+        columnOffset,
+        stacked,
+        isValueAxisH,
+        barMinHeight
+    } = context;
+    const {
+        value,
+        baseValue,
+        stackStartValue
+    } = dataValues;
+
+    let baseCoord = valueAxisStart;
+
+    // Because of the barMinHeight, we can not use the value in
+    // stackResultDimension directly.
+    if (stacked && stackStartValue != null) {
+        const startCoord = isValueAxisH
+            ? cartesian.dataToPoint([stackStartValue, baseValue])
+            : cartesian.dataToPoint([baseValue, stackStartValue]);
+        baseCoord = isValueAxisH ? startCoord[0] : startCoord[1];
+    }
+
+    let x: number;
+    let y: number;
+    let width: number;
+    let height: number;
+
+    if (isValueAxisH) {
+        const coord = cartesian.dataToPoint([value, baseValue]);
+        x = baseCoord;
+        y = coord[1] + columnOffset;
+        width = coord[0] - baseCoord;
+        height = columnWidth;
+
+        if (Math.abs(width) < barMinHeight) {
+            width = (width < 0 ? -1 : 1) * barMinHeight;
+        }
+    }
+    else {
+        const coord = cartesian.dataToPoint([baseValue, value]);
+        x = coord[0] + columnOffset;
+        y = baseCoord;
+        width = columnWidth;
+        height = coord[1] - baseCoord;
+
+        if (Math.abs(height) < barMinHeight) {
+            // Include zero to has a positive bar
+            height = (height <= 0 ? -1 : 1) * barMinHeight;
+        }
+    }
+
+    return { x, y, width, height };
+}
+
 export function layout(seriesType: string, ecModel: GlobalModel) {
 
     const seriesModels = prepareLayoutBarSeries(seriesType, ecModel);
@@ -477,26 +655,13 @@ export function createProgressiveLayout(seriesType: string): StageHandler {
             }
 
             const data = seriesModel.getData();
+            const layoutContext = prepareBarLayoutContext(seriesModel, data);
+            if (!layoutContext) {
+                return;
+            }
 
-            const cartesian = seriesModel.coordinateSystem as Cartesian2D;
-            const baseAxis = cartesian.getBaseAxis();
-            const valueAxis = cartesian.getOtherAxis(baseAxis);
-            const valueDimIdx = data.getDimensionIndex(data.mapDimension(valueAxis.dim));
-            const baseDimIdx = data.getDimensionIndex(data.mapDimension(baseAxis.dim));
             const drawBackground = seriesModel.get('showBackground', true);
-            const valueDim = data.mapDimension(valueAxis.dim);
-            const stackResultDim = data.getCalculationInfo('stackResultDimension');
-            const stacked = isDimensionStacked(data, valueDim) && !!data.getCalculationInfo('stackedOnSeries');
-            const isValueAxisH = valueAxis.isHorizontal();
-            const valueAxisStart = getValueAxisStart(baseAxis, valueAxis);
             const isLarge = isInLargeMode(seriesModel);
-            const barMinHeight = seriesModel.get('barMinHeight') || 0;
-
-            const stackedDimIdx = stackResultDim && data.getDimensionIndex(stackResultDim);
-
-            // Layout info.
-            const columnWidth = data.getLayout('size');
-            const columnOffset = data.getLayout('offset');
 
             return {
                 progress: function (params, data) {
@@ -504,62 +669,18 @@ export function createProgressiveLayout(seriesType: string): StageHandler {
                     const largePoints = isLarge && createFloat32Array(count * 3);
                     const largeBackgroundPoints = isLarge && drawBackground && createFloat32Array(count * 3);
                     const largeDataIndices = isLarge && createFloat32Array(count);
-                    const coordLayout = cartesian.master.getRect();
-                    const bgSize = isValueAxisH ? coordLayout.width : coordLayout.height;
+                    const coordLayout = layoutContext.cartesian.master.getRect();
+                    const bgSize = layoutContext.isValueAxisH ? coordLayout.width : coordLayout.height;
 
                     let dataIndex;
-                    const store = data.getStore();
-
                     let idxOffset = 0;
 
                     while ((dataIndex = params.next()) != null) {
-                        const value = store.get(stacked ? stackedDimIdx : valueDimIdx, dataIndex);
-                        const baseValue = store.get(baseDimIdx, dataIndex) as number;
-                        let baseCoord = valueAxisStart;
-                        let stackStartValue;
+                        const dataValues = getBarDataValues(layoutContext, dataIndex);
 
-                        // Because of the barMinHeight, we can not use the value in
-                        // stackResultDimension directly.
-                        if (stacked) {
-                            stackStartValue = +value - (store.get(valueDimIdx, dataIndex) as number);
-                        }
+                        const layout = calculateBarLayout(layoutContext, dataValues);
 
-                        let x;
-                        let y;
-                        let width;
-                        let height;
-
-                        if (isValueAxisH) {
-                            const coord = cartesian.dataToPoint([value, baseValue]);
-                            if (stacked) {
-                                const startCoord = cartesian.dataToPoint([stackStartValue, baseValue]);
-                                baseCoord = startCoord[0];
-                            }
-                            x = baseCoord;
-                            y = coord[1] + columnOffset;
-                            width = coord[0] - baseCoord;
-                            height = columnWidth;
-
-                            if (Math.abs(width) < barMinHeight) {
-                                width = (width < 0 ? -1 : 1) * barMinHeight;
-                            }
-                        }
-                        else {
-                            const coord = cartesian.dataToPoint([baseValue, value]);
-                            if (stacked) {
-                                const startCoord = cartesian.dataToPoint([baseValue, stackStartValue]);
-                                baseCoord = startCoord[1];
-                            }
-                            x = coord[0] + columnOffset;
-                            y = baseCoord;
-                            width = columnWidth;
-                            height = coord[1] - baseCoord;
-
-                            if (Math.abs(height) < barMinHeight) {
-                                // Include zero to has a positive bar
-                                height = (height <= 0 ? -1 : 1) * barMinHeight;
-                            }
-                        }
+                        const { x, y, width, height } = layout;
 
                         if (!isLarge) {
                             data.setItemLayout(dataIndex, { x, y, width, height });
@@ -567,11 +688,11 @@ export function createProgressiveLayout(seriesType: string): StageHandler {
                         else {
                             largePoints[idxOffset] = x;
                             largePoints[idxOffset + 1] = y;
-                            largePoints[idxOffset + 2] = isValueAxisH ? width : height;
+                            largePoints[idxOffset + 2] = layoutContext.isValueAxisH ? width : height;
 
                             if (largeBackgroundPoints) {
-                                largeBackgroundPoints[idxOffset] = isValueAxisH ? coordLayout.x : x;
-                                largeBackgroundPoints[idxOffset + 1] = isValueAxisH ? y : coordLayout.y;
+                                largeBackgroundPoints[idxOffset] = layoutContext.isValueAxisH ? coordLayout.x : x;
+                                largeBackgroundPoints[idxOffset + 1] = layoutContext.isValueAxisH ? y : coordLayout.y;
                                 largeBackgroundPoints[idxOffset + 2] = bgSize;
                             }
 
@@ -586,7 +707,7 @@ export function createProgressiveLayout(seriesType: string): StageHandler {
                             largePoints,
                             largeDataIndices,
                             largeBackgroundPoints,
-                            valueAxisHorizontal: isValueAxisH
+                            valueAxisHorizontal: layoutContext.isValueAxisH
                         });
                     }
                 }
@@ -604,7 +725,7 @@ function isInLargeMode(seriesModel: BarSeriesModel) {
 }
 
 // See cases in `test/bar-start.html` and `#7412`, `#8747`.
-function getValueAxisStart(baseAxis: Axis2D, valueAxis: Axis2D) {
+export function getValueAxisStart(baseAxis: Axis2D, valueAxis: Axis2D) {
     let startValue = valueAxis.model.get('startValue');
     if (!startValue) {
         startValue = 0;

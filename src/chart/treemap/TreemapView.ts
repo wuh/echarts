@@ -41,9 +41,10 @@ import Tree, { TreeNode } from '../../data/Tree';
 import TreemapSeriesModel, { TreemapSeriesNodeItemOption } from './TreemapSeries';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
+import { LegendAvoidableSeriesView, LayoutLegendContext } from '../../util/autoLayout';
+import { createBoxLayoutReference, getLayoutRect, LayoutRect } from '../../util/layout';
 import Model from '../../model/Model';
-import { LayoutRect } from '../../util/layout';
-import { TreemapLayoutNode } from './treemapLayout';
+import treemapLayout, { TreemapLayoutNode } from './treemapLayout';
 import Element from 'zrender/src/Element';
 import Displayable from 'zrender/src/graphic/Displayable';
 import { makeInner, convertOptionIdName } from '../../util/model';
@@ -146,7 +147,7 @@ const inner = makeInner<{
     willDelete: boolean
 }, Element>();
 
-class TreemapView extends ChartView {
+class TreemapView extends ChartView implements LegendAvoidableSeriesView {
 
     static type = 'treemap';
     type = TreemapView.type;
@@ -161,6 +162,9 @@ class TreemapView extends ChartView {
     private _state: 'ready' | 'animating' = 'ready';
 
     private _storage = createStorage() as RenderElementStorage;
+
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext | undefined;
 
     seriesModel: TreemapSeriesModel;
     api: ExtensionAPI;
@@ -182,6 +186,18 @@ class TreemapView extends ChartView {
             return;
         }
 
+        // 处理自动布局上下文中的边距压缩
+        const autoLayoutContext = this.autoLayoutContext;
+        const margin = autoLayoutContext?.margin;
+        if (margin != null) {
+            treemapLayout.reset(
+                seriesModel,
+                ecModel,
+                api,
+                payload as TreemapZoomToNodePayload | TreemapRenderPayload | TreemapMovePayload,
+                margin
+            );
+        }
         this.seriesModel = seriesModel;
         this.api = api;
         this.ecModel = ecModel;
@@ -693,6 +709,17 @@ class TreemapView extends ChartView {
         this._storage = createStorage() as RenderElementStorage;
         this._state = 'ready';
         this._breadcrumb && this._breadcrumb.remove();
+    }
+
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: TreemapSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: any
+    ): BoundingRect {
+        const refContainer = createBoxLayoutReference(seriesModel, api).refContainer;
+        return getLayoutRect(seriesModel.getBoxLayoutParams(), refContainer);
     }
 
     dispose() {

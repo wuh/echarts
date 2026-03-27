@@ -1,0 +1,5396 @@
+<!DOCTYPE html>
+<!--
+  图例自动布局测试页
+  - 场景覆盖: 多图例(水平/垂直)、与 visualMap 混合、分页
+  - 左右/上下定位、autoLayout 对比非 autoLayout
+-->
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="lib/simpleRequire.js"></script>
+  <script src="lib/config.js"></script>
+  <script src="lib/jquery.min.js"></script>
+  <script src="lib/testHelper.js"></script>
+  <link rel="stylesheet" href="lib/reset.css" />
+  <style>
+    h2 {
+      margin: 12px 0 4px;
+      font-size: 14px;
+    }
+
+    /* 确保图表容器不会超出页面宽度 */
+    .test-chart-block {
+      width: 100%;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="single-legend-auto-layout"></div>
+  <div id="multi-legend-auto-layout" ></div>
+  <div id="space-insufficient-auto-layout" ></div>
+  <div id="multi-grid-auto-layout" ></div>
+  <div id="dual-pie-auto-layout" ></div>
+  <div id="tree-auto-layout" ></div>
+  <div id="treemap-auto-layout" ></div>
+  <div id="dual-radar-auto-layout" ></div>
+  <div id="funnel-auto-layout" ></div>
+  <div id="gauge-auto-layout" ></div>
+  <div id="chord-auto-layout" ></div>
+  <div id="graph-auto-layout" ></div>
+  <div id="polar-bar-auto-layout" ></div>
+  <div id="single-axis-horizontal-auto-layout" ></div>
+  <div id="single-axis-vertical-auto-layout" ></div>
+  <div id="matrix-auto-layout" ></div>
+  <div id="calendar-auto-layout" ></div>
+  <div id="single-visualMap-auto-layout" ></div>
+  <div id="multi-visualMap-auto-layout" ></div>
+  <div id="piecewise-visualMap-auto-layout"></div>
+  <div id="scroll-piecewise-visualMap-auto-layout" ></div>
+  <div id="mixed-legend-visualMap-auto-layout" ></div>
+  <div id="mixed-coordinate-pie-auto-layout"></div>
+
+  <script>
+    require(['echarts'], function (echarts) {
+
+      // 辅助函数：从控件状态中获取实际值
+      function getValueFromControlState(controlState, controlDefine) {
+        if (!controlState || typeof controlState.optionIndex !== 'number') {
+          return controlDefine.value; // 返回默认值
+        }
+        var optionIndex = controlState.optionIndex;
+        if (controlDefine.values) {
+          return controlDefine.values[optionIndex];
+        } else if (controlDefine.options) {
+          return controlDefine.options[optionIndex].value;
+        }
+        return controlDefine.value; // 返回默认值
+      }
+
+      // 辅助函数：获取控件定义
+      function getControlDefinition(paramName) {
+        var controlDefinitions = {
+          'enableAutoLayout': { values: [false, true], value: true },
+          'position': { values: ['bottom', 'top', 'left', 'right'], value: 'bottom' },
+          'align': { values: ['start', 'center', 'end'], value: 'center' },
+          'layoutMode': { values: ['singleLine', 'multiLine'], value: 'multiLine' },
+          'singleOrient': { values: ['horizontal', 'vertical'], value: 'horizontal' },
+          'orient': { values: ['horizontal', 'vertical'], value: 'horizontal' },
+          'horizontalAxisPosition': { values: ['top', 'bottom'], value: 'bottom' },
+          'verticalAxisPosition': { values: ['left', 'right'], value: 'right' },
+          'showAxisName': { values: [false, true], value: true }
+        };
+        return controlDefinitions[paramName] || null;
+      }
+
+      // 通用onchange处理函数
+      function handleOptionChange(chart, optionGenerator, paramNames) {
+        var state = chart.__testHelper.getInputsState();
+        var params = [];
+
+        // 处理参数映射
+        for (var i = 0; i < paramNames.length; i++) {
+          var paramName = paramNames[i];
+          var controlState = state[paramName];
+
+          if (controlState && controlState.value !== undefined) {
+            // range控件：直接使用value
+            params.push(controlState.value);
+          } else if (controlState && controlState.optionIndex !== undefined) {
+            // select控件：使用optionIndex获取值
+            var controlDef = getControlDefinition(paramName);
+            if (controlDef) {
+              params.push(getValueFromControlState(controlState, controlDef));
+            }
+            else {
+              // 默认情况
+              params.push(controlState.optionIndex);
+            }
+          } else {
+            // 默认值
+            params.push(null);
+          }
+        }
+
+        var opt = optionGenerator.apply(null, params);
+        chart.setOption(opt, true);
+      }
+
+      var chart0Names = ['enableAutoLayout', 'position', 'align', 'showAxisName'];
+      var chart1Names = ['enableAutoLayout', 'position', 'align', 'layoutMode', 'legend1Count', 'legend2Count'];
+      var chart2Names = ['enableAutoLayout', 'position', 'align', 'layoutMode'];
+      var chart17Names = ['enableAutoLayout', 'position', 'align'];
+      var chart18Names = ['enableAutoLayout', 'position', 'align', 'layoutMode'];
+      var chart19Names = ['enableAutoLayout', 'position', 'align', 'orient'];
+      var chart20Names = ['enableAutoLayout', 'position', 'align', 'layoutMode', 'visualMap1Count', 'visualMap2Count'];
+      var chart21Names = ['enableAutoLayout', 'position', 'align', 'layoutMode', 'legendCount', 'visualMapCount'];
+      var chart22Names = [
+        'enableAutoLayout', 'position', 'align',
+        'barLeft', 'barTop', 'barWidth', 'barHeight',
+        'pieLeft', 'pieTop', 'pieRadius'
+      ];
+      var chart3Names = [
+        'enableAutoLayout', 'position', 'align',
+        'grid1Left', 'grid1Right', 'grid1Top', 'grid1Bottom',
+        'grid2Left', 'grid2Right', 'grid2Top', 'grid2Bottom'
+      ];
+      var chart4Names = [
+        'enableAutoLayout', 'position', 'align',
+        'pie1Left', 'pie1Top', 'pie1Radius',
+        'pie2Left', 'pie2Top', 'pie2Radius'
+      ];
+      var chart5Names = [
+        'enableAutoLayout', 'position', 'align',
+        'treeLeft', 'treeTop', 'treeWidth', 'treeHeight'
+      ];
+      var chart6Names = [
+        'enableAutoLayout', 'position', 'align',
+        'treemapLeft', 'treemapTop', 'treemapWidth', 'treemapHeight'
+      ];
+      var chart7Names = [
+        'enableAutoLayout', 'position', 'align',
+        'radar1Left', 'radar1Top', 'radar1Radius',
+        'radar2Left', 'radar2Top', 'radar2Radius'
+      ];
+
+      var chart8Names = [
+        'enableAutoLayout', 'position', 'align',
+        'funnel1Left', 'funnel1Top', 'funnel1Width', 'funnel1Height',
+        'funnel2Left', 'funnel2Top', 'funnel2Width', 'funnel2Height'
+      ];
+
+      var chart9Names = [
+        'enableAutoLayout', 'position', 'align',
+        'gauge1CenterX', 'gauge1CenterY', 'gauge1Radius',
+        'gauge2CenterX', 'gauge2CenterY', 'gauge2Radius'
+      ];
+
+      var chart10Names = [
+        'enableAutoLayout', 'position', 'align',
+        'chord1CenterX', 'chord1CenterY', 'chord1Radius',
+        'chord2CenterX', 'chord2CenterY', 'chord2Radius'
+      ];
+
+      var chart11Names = [
+        'enableAutoLayout', 'position', 'align',
+        'graphLeft', 'graphTop', 'graphWidth', 'graphHeight'
+      ];
+
+      // 辅助函数：生成场景0的配置（单图例的自动布局测试）
+      function getOption0(enableAutoLayout, position, align, showAxisName) {
+        var option = {
+          xAxis: {
+            type: 'category',
+            data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            name: showAxisName ? '星期' : undefined
+          },
+          yAxis: {
+            type: 'value',
+            name: showAxisName ? '数值' : undefined
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'bar',
+              data: [120, 200, 150, 80, 70, 110, 130]
+            },
+            {
+              name: '系列B',
+              type: 'bar',
+              data: [60, 100, 75, 40, 35, 55, 65]
+            },
+            {
+              name: '系列C',
+              type: 'bar',
+              data: [30, 50, 37, 20, 17, 27, 32]
+            },
+            {
+              name: '系列D',
+              type: 'bar',
+              data: [15, 25, 18, 10, 8, 13, 16]
+            },
+            {
+              name: '系列E',
+              type: 'bar',
+              data: [7, 12, 9, 5, 4, 6, 8]
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['系列A', '系列B', '系列C', '系列D', '系列E'],
+            // 清除手动定位属性
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        } else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D', '系列E']
+          };
+        }
+
+        return option;
+      }
+
+      // 预定义的固定系列数据模板
+      var barSeriesTemplates = [
+        { name: '系列A', type: 'bar', data: [120, 200, 150, 80, 70, 110, 130] },
+        { name: '系列B', type: 'bar', data: [60, 100, 75, 40, 35, 55, 65] },
+        { name: '系列C', type: 'bar', data: [30, 50, 37, 20, 17, 27, 32] },
+        { name: '系列D', type: 'bar', data: [15, 25, 18, 10, 8, 13, 16] },
+        { name: '系列E', type: 'bar', data: [7, 12, 9, 5, 4, 6, 8] },
+        { name: '系列F', type: 'bar', data: [90, 140, 110, 60, 45, 85, 95] },
+        { name: '系列G', type: 'bar', data: [45, 70, 55, 30, 22, 42, 47] },
+        { name: '系列H', type: 'bar', data: [22, 35, 27, 15, 11, 21, 24] }
+      ];
+
+      var lineSeriesTemplates = [
+        { name: '系列I', type: 'line', data: [80, 120, 100, 60, 50, 80, 90] },
+        { name: '系列J', type: 'line', data: [40, 60, 50, 30, 25, 40, 45] },
+        { name: '系列K', type: 'line', data: [20, 30, 25, 15, 12, 20, 22] },
+        { name: '系列L', type: 'line', data: [50, 80, 60, 40, 30, 50, 55] },
+        { name: '系列M', type: 'line', data: [25, 40, 30, 20, 15, 25, 27] },
+        { name: '系列N', type: 'line', data: [35, 55, 45, 25, 20, 35, 40] },
+        { name: '系列O', type: 'line', data: [15, 25, 20, 12, 10, 15, 17] },
+        { name: '系列P', type: 'line', data: [60, 90, 75, 45, 35, 60, 70] }
+      ];
+
+      // 辅助函数：生成系列名称，支持无限循环（A, B, ..., Z, A-1, B-1, ..., Z-1, A-2, ...）
+      function generateSeriesName(index) {
+        var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        var letterIndex = index % 26;
+        var cycleNumber = Math.floor(index / 26);
+        var letter = letters[letterIndex];
+        if (cycleNumber === 0) {
+          return letter;
+        } else {
+          return letter + '-' + cycleNumber;
+        }
+      }
+
+      // 辅助函数：生成场景1的配置（多图例的自动布局测试）
+      function getOption1(enableAutoLayout, position, align, layoutMode, legend1Count, legend2Count) {
+        // 选择系列数据：图例1的所有系列都是柱形图，图例2的所有系列都是折线图
+        var selectedSeries = [];
+        var legend1Data = [];
+        var legend2Data = [];
+
+        // 选择图例1的系列（柱形图）
+        for (var i = 0; i < legend1Count; i++) {
+          var templateIndex = i % barSeriesTemplates.length;
+          var seriesName = '系列' + generateSeriesName(i);
+          selectedSeries.push({
+            name: seriesName,
+            type: 'bar',
+            data: barSeriesTemplates[templateIndex].data.slice() // 复制数据
+          });
+          legend1Data.push(seriesName);
+        }
+
+        // 选择图例2的系列（折线图）
+        for (var i = 0; i < legend2Count; i++) {
+          var templateIndex = i % lineSeriesTemplates.length;
+          var seriesName = '系列' + generateSeriesName(legend1Count + i);
+          selectedSeries.push({
+            name: seriesName,
+            type: 'line',
+            data: lineSeriesTemplates[templateIndex].data.slice() // 复制数据
+          });
+          legend2Data.push(seriesName);
+        }
+
+        var option = {
+          xAxis: {
+            type: 'category',
+            data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: selectedSeries
+        };
+
+        if (enableAutoLayout) {
+          var legends = [];
+          if (legend1Data.length > 0) {
+            legends.push({
+              type: 'scroll',
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align,
+                layoutMode: layoutMode
+              },
+              data: legend1Data,
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            });
+          }
+          if (legend2Data.length > 0) {
+            legends.push({
+              type: 'scroll',
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align,
+                layoutMode: layoutMode
+              },
+              data: legend2Data,
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            });
+          }
+          option.legend = legends;
+        } else {
+          var legends = [];
+          if (legend1Data.length > 0) {
+            legends.push({
+              data: legend1Data
+            });
+          }
+          if (legend2Data.length > 0) {
+            legends.push({
+              data: legend2Data
+            });
+          }
+          option.legend = legends;
+        }
+
+        return option;
+      }
+
+
+
+      // 辅助函数：生成空间不足测试配置
+      function getOption2(enableAutoLayout, position, align, layoutMode) {
+        var option = {
+          grid: {
+            // 设置较小的grid边距，用于测试图例挤压grid
+            top: 10,
+            left: 10,
+            right: 10,
+            bottom: 10
+          },
+          xAxis: {
+            type: 'category',
+            data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'bar',
+              data: [120, 200, 150, 80, 70]
+            },
+            {
+              name: '系列B',
+              type: 'bar',
+              data: [60, 100, 75, 40, 35]
+            },
+            {
+              name: '系列C',
+              type: 'bar',
+              data: [30, 50, 37, 20, 17]
+            },
+            {
+              name: '系列D',
+              type: 'bar',
+              data: [15, 25, 18, 10, 8]
+            },
+            {
+              name: '系列E',
+              type: 'bar',
+              data: [7, 12, 9, 5, 4]
+            },
+            {
+              name: '系列F',
+              type: 'line',
+              data: [80, 120, 100, 60, 50]
+            },
+            {
+              name: '系列G',
+              type: 'line',
+              data: [40, 60, 50, 30, 25]
+            },
+            {
+              name: '系列H',
+              type: 'line',
+              data: [20, 30, 25, 15, 12]
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align,
+                layoutMode: layoutMode
+              },
+              data: ['系列A', '系列B', '系列C', '系列D', '系列E'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align,
+                layoutMode: layoutMode
+              },
+              data: ['系列F', '系列G', '系列H'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: ['系列A', '系列B', '系列C', '系列D', '系列E']
+            },
+            {
+              data: ['系列F', '系列G', '系列H']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成多grid双向条形图配置
+      function getOption3(enableAutoLayout, position, align, grid1Left, grid1Right, grid1Top, grid1Bottom, grid2Left, grid2Right, grid2Top, grid2Bottom) {
+        var option = {
+          // 左侧grid（男性数据）
+          grid: [
+            {
+              left: grid1Left + '%',
+              right: grid1Right + '%',
+              top: grid1Top + '%',
+              bottom: grid1Bottom + '%',
+            },
+            // 右侧grid（女性数据）
+            {
+              left: grid2Left + '%',
+              right: grid2Right + '%',
+              top: grid2Top + '%',
+              bottom: grid2Bottom + '%',
+            }
+          ],
+          xAxis: [
+            {
+              type: 'value',
+              gridIndex: 0,
+              name: '男性',
+              position: 'top'
+            },
+            {
+              type: 'value',
+              gridIndex: 1,
+              name: '女性',
+              position: 'top',
+              inverse: true
+            }
+          ],
+          yAxis: [
+            {
+              type: 'category',
+              gridIndex: 0,
+              data: ['产品A', '产品B', '产品C', '产品D', '产品E'],
+              axisLabel: {
+                show: false
+              }
+            },
+            {
+              type: 'category',
+              gridIndex: 1,
+              data: ['产品A', '产品B', '产品C', '产品D', '产品E'],
+              position: 'right'
+            }
+          ],
+          series: [
+            {
+              name: '男性偏好',
+              type: 'bar',
+              xAxisIndex: 0,
+              yAxisIndex: 0,
+              data: [85, 72, 68, 45, 32]
+            },
+            {
+              name: '女性偏好',
+              type: 'bar',
+              xAxisIndex: 1,
+              yAxisIndex: 1,
+              data: [78, 65, 82, 58, 42]
+            },
+            {
+              name: '中性偏好',
+              type: 'bar',
+              xAxisIndex: 0,
+              yAxisIndex: 0,
+              data: [45, 38, 52, 28, 25]
+            },
+            {
+              name: '高端偏好',
+              type: 'bar',
+              xAxisIndex: 1,
+              yAxisIndex: 1,
+              data: [62, 48, 35, 68, 55]
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['男性偏好', '女性偏好', '中性偏好', '高端偏好'],
+            // 清除手动定位属性
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        } else {
+          option.legend = {
+            data: ['男性偏好', '女性偏好', '中性偏好', '高端偏好'],
+            top: 'bottom'
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景4的配置（双饼图的自动布局测试）
+      function getOption4(enableAutoLayout, position, align, pie1Left, pie1Top, pie1Radius, pie2Left, pie2Top, pie2Radius) {
+        // 预定义的饼图数据模板
+        var pieDataTemplates = [
+          [
+            { value: 1048, name: '搜索引擎' },
+            { value: 735, name: '直接访问' },
+            { value: 580, name: '邮件营销' },
+            { value: 484, name: '联盟广告' },
+            { value: 300, name: '视频广告' }
+          ],
+          [
+            { value: 800, name: '移动端' },
+            { value: 600, name: 'PC端' },
+            { value: 450, name: '平板' },
+            { value: 350, name: '其他' }
+          ]
+        ];
+
+        var option = {
+          series: [
+            {
+              name: '流量来源',
+              type: 'pie',
+              radius: pie1Radius + '%',
+              center: [pie1Left + '%', pie1Top + '%'],
+              data: pieDataTemplates[0]
+            },
+            {
+              name: '设备类型',
+              type: 'pie',
+              radius: pie2Radius + '%',
+              center: [pie2Left + '%', pie2Top + '%'],
+              data: pieDataTemplates[1]
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['搜索引擎', '直接访问', '邮件营销', '联盟广告', '视频广告'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['移动端', 'PC端', '平板', '其他'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: ['搜索引擎', '直接访问', '邮件营销', '联盟广告', '视频广告']
+            },
+            {
+              data: ['移动端', 'PC端', '平板', '其他']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景5的配置（树图的自动布局测试）
+      function getOption5(enableAutoLayout, position, align, treeLeft, treeTop, treeWidth, treeHeight) {
+        var option = {
+          series: [
+            {
+              name: '分支A',
+              type: 'tree',
+              data: [
+                {
+                  name: '分支A',
+                  itemStyle: { color: '#91cc75' },
+                  children: [
+                    { name: '叶子A1', itemStyle: { color: '#fac858' } },
+                    { name: '叶子A2', itemStyle: { color: '#ee6666' } },
+                    { name: '叶子A3', itemStyle: { color: '#73c0de' } }
+                  ]
+                }
+              ],
+              top: treeTop + '%',
+              left: (treeLeft + 0) + '%',
+              width: (treeWidth / 3) + '%',
+              height: treeHeight + '%',
+              symbolSize: 12,
+              orient: 'vertical',
+              edgeShape: 'polyline',
+              edgeForkPosition: '50%',
+              initialTreeDepth: -1,
+              animationDuration: 550,
+              animationDurationUpdate: 750,
+              label: {
+                show: true,
+                position: 'bottom',
+                verticalAlign: 'middle',
+                align: 'center',
+                fontSize: 8
+              },
+              emphasis: {
+                focus: 'descendant'
+              }
+            },
+            {
+              name: '分支B',
+              type: 'tree',
+              data: [
+                {
+                  name: '分支B',
+                  itemStyle: { color: '#3ba272' },
+                  children: [
+                    { name: '叶子B1', itemStyle: { color: '#fc8452' } },
+                    { name: '叶子B2', itemStyle: { color: '#9a60b4' } }
+                  ]
+                }
+              ],
+              top: treeTop + '%',
+              left: (treeLeft + treeWidth / 3) + '%',
+              width: (treeWidth / 3) + '%',
+              height: treeHeight + '%',
+              symbolSize: 12,
+              orient: 'vertical',
+              edgeShape: 'polyline',
+              edgeForkPosition: '50%',
+              initialTreeDepth: -1,
+              animationDuration: 550,
+              animationDurationUpdate: 750,
+              label: {
+                show: true,
+                position: 'bottom',
+                verticalAlign: 'middle',
+                align: 'center',
+                fontSize: 8
+              },
+              emphasis: {
+                focus: 'descendant'
+              }
+            },
+            {
+              name: '分支C',
+              type: 'tree',
+              data: [
+                {
+                  name: '分支C',
+                  itemStyle: { color: '#ea7ccc' },
+                  children: [
+                    { name: '叶子C1', itemStyle: { color: '#5470c6' } },
+                    { name: '叶子C2', itemStyle: { color: '#91cc75' } },
+                    { name: '叶子C3', itemStyle: { color: '#fac858' } },
+                    { name: '叶子C4', itemStyle: { color: '#ee6666' } }
+                  ]
+                }
+              ],
+              top: treeTop + '%',
+              left: (treeLeft + 2 * treeWidth / 3) + '%',
+              width: (treeWidth / 3) + '%',
+              height: treeHeight + '%',
+              symbolSize: 12,
+              orient: 'vertical',
+              edgeShape: 'polyline',
+              edgeForkPosition: '50%',
+              initialTreeDepth: -1,
+              animationDuration: 550,
+              animationDurationUpdate: 750,
+              label: {
+                show: true,
+                position: 'bottom',
+                verticalAlign: 'middle',
+                align: 'center',
+                fontSize: 8
+              },
+              emphasis: {
+                focus: 'descendant'
+              }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            type: 'scroll',
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['分支A', '分支B', '分支C'],
+            selectedMode: 'multiple',
+            // 清除手动定位属性
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        } else {
+          option.legend = {
+            type: 'scroll',
+            data: ['分支A', '分支B', '分支C'],
+            selectedMode: 'multiple'
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景7的配置（双雷达图的自动布局测试）
+      function getOption7(enableAutoLayout, position, align, radar1Left, radar1Top, radar1Radius, radar2Left, radar2Top, radar2Radius) {
+        // 两个雷达图的指标定义
+        var radarIndicators = [
+          // 雷达图1：技术指标
+          [
+            { name: '前端开发', max: 100 },
+            { name: '后端开发', max: 100 },
+            { name: '数据库', max: 100 },
+            { name: '测试', max: 100 },
+            { name: '运维', max: 100 }
+          ],
+          // 雷达图2：业务指标
+          [
+            { name: '销售额', max: 100 },
+            { name: '客户满意度', max: 100 },
+            { name: '市场份额', max: 100 },
+            { name: '增长率', max: 100 },
+            { name: '利润率', max: 100 }
+          ]
+        ];
+
+        var option = {
+          radar: [
+            {
+              id: 'tech',
+              indicator: radarIndicators[0],
+              center: [radar1Left + '%', radar1Top + '%'],
+              radius: radar1Radius + '%'
+            },
+            {
+              id: 'business',
+              indicator: radarIndicators[1],
+              center: [radar2Left + '%', radar2Top + '%'],
+              radius: radar2Radius + '%'
+            }
+          ],
+          series: [
+            {
+              name: '技术团队A',
+              type: 'radar',
+              radarIndex: 0,
+              data: [
+                {
+                  value: [85, 72, 68, 45, 32],
+                  name: '技术团队A'
+                }
+              ]
+            },
+            {
+              name: '技术团队B',
+              type: 'radar',
+              radarIndex: 0,
+              data: [
+                {
+                  value: [65, 88, 92, 55, 68],
+                  name: '技术团队B'
+                }
+              ]
+            },
+            {
+              name: '技术团队C',
+              type: 'radar',
+              radarIndex: 0,
+              data: [
+                {
+                  value: [72, 55, 75, 88, 45],
+                  name: '技术团队C'
+                }
+              ]
+            },
+            {
+              name: '公司A',
+              type: 'radar',
+              radarIndex: 1,
+              data: [
+                {
+                  value: [78, 85, 65, 92, 45],
+                  name: '公司A'
+                }
+              ]
+            },
+            {
+              name: '公司B',
+              type: 'radar',
+              radarIndex: 1,
+              data: [
+                {
+                  value: [85, 72, 88, 65, 78],
+                  name: '公司B'
+                }
+              ]
+            },
+            {
+              name: '公司C',
+              type: 'radar',
+              radarIndex: 1,
+              data: [
+                {
+                  value: [68, 92, 72, 85, 58],
+                  name: '公司C'
+                }
+              ]
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['技术团队A', '技术团队B', '技术团队C'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['公司A', '公司B', '公司C'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        }
+        else {
+          option.legend = [
+            {
+              data: ['技术团队A', '技术团队B', '技术团队C']
+            },
+            {
+              data: ['公司A', '公司B', '公司C']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景8的配置（双漏斗图的自动布局测试）
+      function getOption8(enableAutoLayout, position, align, funnel1Left, funnel1Top, funnel1Width, funnel1Height, funnel2Left, funnel2Top, funnel2Width, funnel2Height) {
+        // 漏斗图数据模板
+        var funnelDataTemplates = [
+          [
+            { value: 60, name: '访问' },
+            { value: 40, name: '咨询' },
+            { value: 20, name: '订单' },
+            { value: 80, name: '点击' },
+            { value: 100, name: '展现' }
+          ],
+          [
+            { value: 80, name: '展示' },
+            { value: 60, name: '点击' },
+            { value: 30, name: '注册' },
+            { value: 50, name: '下载' },
+            { value: 90, name: '访问' }
+          ]
+        ];
+
+        var option = {
+          series: [
+            {
+              name: '流量漏斗',
+              type: 'funnel',
+              left: funnel1Left + '%',
+              top: funnel1Top + '%',
+              width: funnel1Width + '%',
+              height: funnel1Height + '%',
+              data: funnelDataTemplates[0],
+              sort: 'descending'
+            },
+            {
+              name: '转化漏斗',
+              type: 'funnel',
+              left: funnel2Left + '%',
+              top: funnel2Top + '%',
+              width: funnel2Width + '%',
+              height: funnel2Height + '%',
+              data: funnelDataTemplates[1],
+              sort: 'descending'
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['展现', '点击', '访问', '咨询', '订单'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['访问', '展示', '下载', '点击', '注册'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: ['展现', '点击', '访问', '咨询', '订单']
+            },
+            {
+              data: ['访问', '展示', '下载', '点击', '注册']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景9的配置（双仪表盘的自动布局测试）
+      function getOption9(enableAutoLayout, position, align, gauge1CenterX, gauge1CenterY, gauge1Radius, gauge2CenterX, gauge2CenterY, gauge2Radius) {
+        var option = {
+          series: [
+            {
+              name: '仪表盘A',
+              type: 'gauge',
+              center: [gauge1CenterX + '%', gauge1CenterY + '%'],
+              radius: gauge1Radius + '%',
+              min: 0,
+              max: 100,
+              splitNumber: 5,
+              data: [
+                {
+                  value: 75,
+                  name: '仪表盘A'
+                }
+              ],
+              title: {
+                offsetCenter: [0, '-20%']
+              },
+              detail: {
+                offsetCenter: [0, '20%']
+              }
+            },
+            {
+              name: '仪表盘B',
+              type: 'gauge',
+              center: [gauge2CenterX + '%', gauge2CenterY + '%'],
+              radius: gauge2Radius + '%',
+              min: 0,
+              max: 200,
+              splitNumber: 4,
+              data: [
+                {
+                  value: 120,
+                  name: '仪表盘B'
+                }
+              ],
+              title: {
+                offsetCenter: [0, '-20%']
+              },
+              detail: {
+                offsetCenter: [0, '20%']
+              }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['仪表盘A'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['仪表盘B'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: ['仪表盘A']
+            },
+            {
+              data: ['仪表盘B']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景10的配置（双和弦图的自动布局测试）
+      function getOption10(enableAutoLayout, position, align, chord1CenterX, chord1CenterY, chord1Radius, chord2CenterX, chord2CenterY, chord2Radius) {
+        var option = {
+          series: [
+            {
+              name: '和弦图A',
+              type: 'chord',
+              center: [chord1CenterX + '%', chord1CenterY + '%'],
+              radius: [chord1Radius * 0.7 + '%', chord1Radius + '%'],
+              data: [
+                { name: '北京' },
+                { name: '上海' },
+                { name: '广州' },
+                { name: '深圳' },
+                { name: '天津' },
+                { name: '重庆' },
+                { name: '南京' }
+              ],
+              links: [
+                { source: '北京', target: '上海', value: 95 },
+                { source: '北京', target: '广州', value: 80 },
+                { source: '北京', target: '深圳', value: 75 },
+                { source: '北京', target: '天津', value: 70 },
+                { source: '北京', target: '重庆', value: 60 },
+                { source: '北京', target: '南京', value: 55 },
+                { source: '上海', target: '广州', value: 70 },
+                { source: '上海', target: '深圳', value: 65 },
+                { source: '上海', target: '天津', value: 60 },
+                { source: '广州', target: '深圳', value: 90 },
+                { source: '广州', target: '重庆', value: 50 },
+                { source: '深圳', target: '广州', value: 85 },
+                { source: '天津', target: '北京', value: 75 },
+                { source: '重庆', target: '南京', value: 45 },
+                { source: '南京', target: '上海', value: 80 }
+              ],
+              label: {
+                show: true,
+                position: 'outside'
+              }
+            },
+            {
+              name: '和弦图B',
+              type: 'chord',
+              center: [chord2CenterX + '%', chord2CenterY + '%'],
+              radius: [chord2Radius * 0.7 + '%', chord2Radius + '%'],
+              data: [
+                { name: '杭州' },
+                { name: '南京' },
+                { name: '苏州' },
+                { name: '无锡' },
+                { name: '宁波' },
+                { name: '温州' },
+                { name: '绍兴' },
+                { name: '嘉兴' }
+              ],
+              links: [
+                { source: '杭州', target: '南京', value: 85 },
+                { source: '杭州', target: '苏州', value: 75 },
+                { source: '杭州', target: '无锡', value: 70 },
+                { source: '杭州', target: '宁波', value: 95 },
+                { source: '杭州', target: '温州', value: 60 },
+                { source: '杭州', target: '绍兴', value: 85 },
+                { source: '杭州', target: '嘉兴', value: 80 },
+                { source: '南京', target: '苏州', value: 80 },
+                { source: '南京', target: '无锡', value: 65 },
+                { source: '南京', target: '宁波', value: 50 },
+                { source: '苏州', target: '无锡', value: 85 },
+                { source: '苏州', target: '嘉兴', value: 70 },
+                { source: '无锡', target: '苏州', value: 75 },
+                { source: '宁波', target: '温州', value: 90 },
+                { source: '宁波', target: '绍兴', value: 85 },
+                { source: '温州', target: '宁波', value: 80 },
+                { source: '绍兴', target: '嘉兴', value: 75 },
+                { source: '嘉兴', target: '杭州', value: 90 }
+              ],
+              label: {
+                show: true,
+                position: 'outside'
+              }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['北京', '上海', '广州', '深圳', '天津', '重庆', '南京'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            },
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: ['杭州', '南京', '苏州', '无锡', '宁波', '温州', '绍兴', '嘉兴'],
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: ['北京', '上海', '广州', '深圳', '天津', '重庆', '南京']
+            },
+            {
+              data: ['杭州', '南京', '苏州', '无锡', '宁波', '温州', '绍兴', '嘉兴']
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景11的配置（力导向图的自动布局测试）
+      function getOption11(enableAutoLayout, position, align, graphLeft, graphTop, graphWidth, graphHeight) {
+        // 模拟Les Miserables风格的数据结构
+        var graphData = {
+          nodes: [
+            { id: 'Myriel', name: 'Myriel', symbolSize: 28.685715, category: 0 },
+            { id: 'Napoleon', name: 'Napoleon', symbolSize: 4, category: 1 },
+            { id: 'MlleBaptistine', name: 'Mlle.Baptistine', symbolSize: 9.621857, category: 1 },
+            { id: 'MmeMagloire', name: 'Mme.Magloire', symbolSize: 8.642857, category: 1 },
+            { id: 'CountessDeLo', name: 'Countess de Lo', symbolSize: 13.288889, category: 1 },
+            { id: 'Geborand', name: 'Geborand', symbolSize: 4.928571, category: 1 },
+            { id: 'Champtercier', name: 'Champtercier', symbolSize: 4.928571, category: 1 },
+            { id: 'Cravatte', name: 'Cravatte', symbolSize: 4.928571, category: 1 },
+            { id: 'Count', name: 'Count', symbolSize: 4.928571, category: 1 },
+            { id: 'OldMan', name: 'Old Man', symbolSize: 4.928571, category: 1 },
+            { id: 'Valjean', name: 'Valjean', symbolSize: 36.6, category: 0 },
+            { id: 'Labarre', name: 'Labarre', symbolSize: 4.928571, category: 1 },
+            { id: 'Marguerite', name: 'Marguerite', symbolSize: 4.928571, category: 1 },
+            { id: 'MmeDeR', name: 'Mme.de R', symbolSize: 4.928571, category: 1 },
+            { id: 'Isabeau', name: 'Isabeau', symbolSize: 4.928571, category: 1 },
+            { id: 'Gervais', name: 'Gervais', symbolSize: 4.928571, category: 1 },
+            { id: 'Fauchelevent', name: 'Fauchelevent', symbolSize: 6.8, category: 2 },
+            { id: 'Bamatabois', name: 'Bamatabois', symbolSize: 12.818182, category: 2 },
+            { id: 'Simplice', name: 'Simplice', symbolSize: 4.928571, category: 2 },
+            { id: 'Scaufflaire', name: 'Scaufflaire', symbolSize: 4.928571, category: 2 },
+            { id: 'Woman1', name: 'Woman 1', symbolSize: 4.928571, category: 2 },
+            { id: 'Judge', name: 'Judge', symbolSize: 11.636364, category: 2 },
+            { id: 'Champmathieu', name: 'Champmathieu', symbolSize: 6.8, category: 2 },
+            { id: 'Brevet', name: 'Brevet', symbolSize: 4.928571, category: 2 },
+            { id: 'Chenildieu', name: 'Chenildieu', symbolSize: 4.928571, category: 2 },
+            { id: 'Cochepaille', name: 'Cochepaille', symbolSize: 4.928571, category: 2 },
+            { id: 'Cosette', name: 'Cosette', symbolSize: 28.266667, category: 3 },
+            { id: 'Javert', name: 'Javert', symbolSize: 32.166667, category: 4 },
+            { id: 'Fantine', name: 'Fantine', symbolSize: 16.166667, category: 3 },
+            { id: 'MmeThenardier', name: 'Mme.Thenardier', symbolSize: 8.5, category: 5 },
+            { id: 'Thenardier', name: 'Thenardier', symbolSize: 16.75, category: 5 }
+          ],
+          links: [
+            { source: 'Napoleon', target: 'Myriel', value: 1 },
+            { source: 'MlleBaptistine', target: 'Myriel', value: 8 },
+            { source: 'MmeMagloire', target: 'Myriel', value: 10 },
+            { source: 'MmeMagloire', target: 'MlleBaptistine', value: 6 },
+            { source: 'CountessDeLo', target: 'Myriel', value: 1 },
+            { source: 'Geborand', target: 'Myriel', value: 1 },
+            { source: 'Champtercier', target: 'Myriel', value: 1 },
+            { source: 'Cravatte', target: 'Myriel', value: 1 },
+            { source: 'Count', target: 'Myriel', value: 2 },
+            { source: 'OldMan', target: 'Myriel', value: 1 },
+            { source: 'Valjean', target: 'Myriel', value: 1 },
+            { source: 'Labarre', target: 'Myriel', value: 1 },
+            { source: 'Marguerite', target: 'Myriel', value: 2 },
+            { source: 'MmeDeR', target: 'Myriel', value: 1 },
+            { source: 'Isabeau', target: 'Myriel', value: 1 },
+            { source: 'Gervais', target: 'Myriel', value: 1 },
+            { source: 'Fauchelevent', target: 'Valjean', value: 4 },
+            { source: 'Bamatabois', target: 'Valjean', value: 7 },
+            { source: 'Bamatabois', target: 'Fauchelevent', value: 2 },
+            { source: 'Simplice', target: 'Valjean', value: 4 },
+            { source: 'Simplice', target: 'Fauchelevent', value: 4 },
+            { source: 'Simplice', target: 'Bamatabois', value: 1 },
+            { source: 'Scaufflaire', target: 'Valjean', value: 9 },
+            { source: 'Woman1', target: 'Valjean', value: 2 },
+            { source: 'Judge', target: 'Valjean', value: 3 },
+            { source: 'Judge', target: 'Bamatabois', value: 2 },
+            { source: 'Champmathieu', target: 'Valjean', value: 11 },
+            { source: 'Champmathieu', target: 'Judge', value: 3 },
+            { source: 'Champmathieu', target: 'Bamatabois', value: 2 },
+            { source: 'Brevet', target: 'Valjean', value: 7 },
+            { source: 'Brevet', target: 'Judge', value: 1 },
+            { source: 'Brevet', target: 'Champmathieu', value: 1 },
+            { source: 'Chenildieu', target: 'Valjean', value: 7 },
+            { source: 'Chenildieu', target: 'Judge', value: 2 },
+            { source: 'Chenildieu', target: 'Champmathieu', value: 2 },
+            { source: 'Chenildieu', target: 'Brevet', value: 2 },
+            { source: 'Cochepaille', target: 'Valjean', value: 7 },
+            { source: 'Cochepaille', target: 'Judge', value: 3 },
+            { source: 'Cochepaille', target: 'Champmathieu', value: 3 },
+            { source: 'Cochepaille', target: 'Brevet', value: 2 },
+            { source: 'Cochepaille', target: 'Chenildieu', value: 2 },
+            { source: 'Cosette', target: 'Valjean', value: 31 },
+            { source: 'Cosette', target: 'Fauchelevent', value: 8 },
+            { source: 'Cosette', target: 'Javert', value: 17 },
+            { source: 'Cosette', target: 'Fantine', value: 8 },
+            { source: 'Javert', target: 'Valjean', value: 17 },
+            { source: 'Javert', target: 'Fauchelevent', value: 5 },
+            { source: 'Javert', target: 'Bamatabois', value: 5 },
+            { source: 'Javert', target: 'Simplice', value: 1 },
+            { source: 'Javert', target: 'Scaufflaire', value: 1 },
+            { source: 'Javert', target: 'Woman1', value: 1 },
+            { source: 'Javert', target: 'Judge', value: 1 },
+            { source: 'Javert', target: 'Champmathieu', value: 1 },
+            { source: 'Javert', target: 'Brevet', value: 2 },
+            { source: 'Javert', target: 'Chenildieu', value: 1 },
+            { source: 'Javert', target: 'Cochepaille', value: 1 },
+            { source: 'Fantine', target: 'Valjean', value: 9 },
+            { source: 'Fantine', target: 'Marguerite', value: 1 },
+            { source: 'Fantine', target: 'MmeThenardier', value: 2 },
+            { source: 'Fantine', target: 'Thenardier', value: 6 },
+            { source: 'MmeThenardier', target: 'Thenardier', value: 13 },
+            { source: 'MmeThenardier', target: 'Cosette', value: 1 },
+            { source: 'Thenardier', target: 'Cosette', value: 12 },
+            { source: 'Thenardier', target: 'Javert', value: 1 }
+          ],
+          categories: [
+            { name: '主教和神职人员' },
+            { name: 'Myriel的朋友' },
+            { name: 'Valjean的熟人' },
+            { name: 'Cosette和Fantine' },
+            { name: 'Javert' },
+            { name: 'Thenardier夫妇' }
+          ]
+        };
+
+        // 处理节点标签显示逻辑：根据symbolSize决定是否显示标签
+        graphData.nodes.forEach(function (node) {
+          node.label = {
+            show: node.symbolSize > 30
+          };
+        });
+
+        var option = {
+          title: {
+            text: 'Les Miserables',
+            subtext: '力导向图自动布局测试',
+            top: 'bottom',
+            left: 'right'
+          },
+          tooltip: {},
+          animationDuration: 1500,
+          animationEasingUpdate: 'quinticInOut',
+          series: [
+            {
+              name: 'Les Miserables',
+              type: 'graph',
+              layout: 'force',
+              left: graphLeft + '%',
+              top: graphTop + '%',
+              width: graphWidth + '%',
+              height: graphHeight + '%',
+              data: graphData.nodes,
+              links: graphData.links,
+              categories: graphData.categories,
+              roam: true,
+              focusNodeAdjacency: true,
+              draggable: true,
+              label: {
+                position: 'right',
+                formatter: '{b}',
+                fontSize: 12
+              },
+              force: {
+                repulsion: 100,
+                edgeLength: [50, 200],
+                layoutAnimation: false
+              },
+              emphasis: {
+                focus: 'adjacency',
+                lineStyle: {
+                  width: 10
+                }
+              }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = [
+            {
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: graphData.categories.map(function (a) {
+                return a.name;
+              }),
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            }
+          ];
+        } else {
+          option.legend = [
+            {
+              data: graphData.categories.map(function (a) {
+                return a.name;
+              })
+            }
+          ];
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景12的配置（多极坐标系自动布局测试）
+      function getOption12(enableAutoLayout, position, align, polar1CenterX, polar1CenterY, polar1Radius, polar2CenterX, polar2CenterY, polar2Radius, legend1Count, legend2Count) {
+        // 选择系列数据
+        var selectedSeries = [];
+        var legend1Data = [];
+        var legend2Data = [];
+
+        // 定义极坐标系系列模板
+        var polarSeriesTemplates = [
+          {
+            name: '极坐标系柱状图A',
+            type: 'bar',
+            coordinateSystem: 'polar',
+            polarId: 'polar1',
+            data: [2, 4, 7, 3, 6, 5, 8],
+            itemStyle: {
+              color: '#5470c6'
+            }
+          },
+          {
+            name: '极坐标系柱状图B',
+            type: 'bar',
+            coordinateSystem: 'polar',
+            polarId: 'polar2',
+            data: [8, 6, 4, 2],
+            itemStyle: {
+              color: '#91cc75'
+            }
+          }
+        ];
+
+        // 选择图例1的系列（polar1）
+        for (var i = 0; i < legend1Count; i++) {
+          var templateIndex = i % 1; // 只有一个polar1模板
+          var seriesName = '系列' + generateSeriesName(i) + '-极坐标A';
+          var series = JSON.parse(JSON.stringify(polarSeriesTemplates[0])); // 深拷贝
+          series.name = seriesName;
+          selectedSeries.push(series);
+          legend1Data.push(seriesName);
+        }
+
+        // 选择图例2的系列（polar2）
+        for (var i = 0; i < legend2Count; i++) {
+          var templateIndex = i % 1; // 只有一个polar2模板
+          var seriesName = '系列' + generateSeriesName(legend1Count + i) + '-极坐标B';
+          var series = JSON.parse(JSON.stringify(polarSeriesTemplates[1])); // 深拷贝
+          series.name = seriesName;
+          selectedSeries.push(series);
+          legend2Data.push(seriesName);
+        }
+
+        var option = {
+          polar: [
+            {
+              id: 'polar1',
+              center: [polar1CenterX + '%', polar1CenterY + '%'],
+              radius: polar1Radius + '%'
+            },
+            {
+              id: 'polar2',
+              center: [polar2CenterX + '%', polar2CenterY + '%'],
+              radius: polar2Radius + '%'
+            }
+          ],
+          angleAxis: [
+            {
+              polarId: 'polar1',
+              type: 'category',
+              data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            },
+            {
+              polarId: 'polar2',
+              type: 'category',
+              data: ['春季', '夏季', '秋季', '冬季']
+            }
+          ],
+          radiusAxis: [
+            {
+              polarId: 'polar1',
+              type: 'value'
+            },
+            {
+              polarId: 'polar2',
+              type: 'value'
+            }
+          ],
+          series: selectedSeries
+        };
+
+        if (enableAutoLayout) {
+          var legends = [];
+          if (legend1Data.length > 0) {
+            legends.push({
+              type: 'scroll',
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: legend1Data,
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            });
+          }
+          if (legend2Data.length > 0) {
+            legends.push({
+              type: 'scroll',
+              autoLayout: {
+                enable: true,
+                position: position,
+                align: align
+              },
+              data: legend2Data,
+              // 清除手动定位属性
+              left: undefined,
+              right: undefined,
+              top: undefined,
+              bottom: undefined
+            });
+          }
+          option.legend = legends;
+        } else {
+          var legends = [];
+          if (legend1Data.length > 0) {
+            legends.push({
+              data: legend1Data
+            });
+          }
+          if (legend2Data.length > 0) {
+            legends.push({
+              data: legend2Data
+            });
+          }
+          option.legend = legends;
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景13的配置（水平单轴坐标系自动布局测试）
+      function getOption13(enableAutoLayout, position, align, singleLeft, singleTop, singleRight, singleBottom, horizontalAxisPosition) {
+        // 固定使用4个系列
+        var option = {
+          singleAxis: {
+            left: singleLeft + '%',
+            top: singleTop + '%',
+            right: singleRight + '%',
+            bottom: singleBottom + '%',
+            orient: 'horizontal',
+            position: horizontalAxisPosition,
+            type: 'time'
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'themeRiver',
+              coordinateSystem: 'singleAxis',
+              data: [
+                ['2024-01-01', 120, '系列A'],
+                ['2024-01-02', 200, '系列A'],
+                ['2024-01-03', 150, '系列A'],
+                ['2024-01-04', 80, '系列A'],
+                ['2024-01-05', 70, '系列A']
+              ],
+              itemStyle: { color: '#5470c6' }
+            },
+            {
+              name: '系列B',
+              type: 'themeRiver',
+              coordinateSystem: 'singleAxis',
+              data: [
+                ['2024-01-01', 60, '系列B'],
+                ['2024-01-02', 100, '系列B'],
+                ['2024-01-03', 75, '系列B'],
+                ['2024-01-04', 40, '系列B'],
+                ['2024-01-05', 35, '系列B']
+              ],
+              itemStyle: { color: '#91cc75' }
+            },
+            {
+              name: '系列C',
+              type: 'themeRiver',
+              coordinateSystem: 'singleAxis',
+              data: [
+                ['2024-01-01', 30, '系列C'],
+                ['2024-01-02', 50, '系列C'],
+                ['2024-01-03', 37, '系列C'],
+                ['2024-01-04', 20, '系列C'],
+                ['2024-01-05', 17, '系列C']
+              ],
+              itemStyle: { color: '#fac858' }
+            },
+            {
+              name: '系列D',
+              type: 'themeRiver',
+              coordinateSystem: 'singleAxis',
+              data: [
+                ['2024-01-01', 90, '系列D'],
+                ['2024-01-02', 140, '系列D'],
+                ['2024-01-03', 110, '系列D'],
+                ['2024-01-04', 60, '系列D'],
+                ['2024-01-05', 45, '系列D']
+              ],
+              itemStyle: { color: '#ee6666' }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景14的配置（垂直单轴坐标系自动布局测试）
+      function getOption14(enableAutoLayout, position, align, singleLeft, singleTop, singleRight, singleBottom, verticalAxisPosition) {
+        // 固定使用4个系列
+        var option = {
+          singleAxis: {
+            left: singleLeft + '%',
+            top: singleTop + '%',
+            right: singleRight + '%',
+            bottom: singleBottom + '%',
+            orient: 'vertical',
+            position: verticalAxisPosition,
+            type: 'value',
+            min: 0,
+            max: 250
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'scatter',
+              coordinateSystem: 'singleAxis',
+              data: [120, 200, 150, 80, 70],
+              symbolSize: 15,
+              itemStyle: { color: '#5470c6' }
+            },
+            {
+              name: '系列B',
+              type: 'scatter',
+              coordinateSystem: 'singleAxis',
+              data: [60, 100, 75, 40, 35],
+              symbolSize: 15,
+              itemStyle: { color: '#91cc75' }
+            },
+            {
+              name: '系列C',
+              type: 'scatter',
+              coordinateSystem: 'singleAxis',
+              data: [30, 50, 37, 20, 17],
+              symbolSize: 15,
+              itemStyle: { color: '#fac858' }
+            },
+            {
+              name: '系列D',
+              type: 'scatter',
+              coordinateSystem: 'singleAxis',
+              data: [90, 140, 110, 60, 45],
+              symbolSize: 15,
+              itemStyle: { color: '#ee6666' }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景15的配置（矩阵坐标系自动布局测试）
+      function getOption15(enableAutoLayout, position, align, matrixLeft, matrixTop, matrixRight, matrixBottom) {
+        // 固定使用4个系列
+        var option = {
+          matrix: {
+            left: matrixLeft + '%',
+            top: matrixTop + '%',
+            right: matrixRight + '%',
+            bottom: matrixBottom + '%',
+            x: {
+              data: ['产品A', '产品B', '产品C', '产品D']
+            },
+            y: {
+              data: ['Q1', 'Q2', 'Q3', 'Q4']
+            }
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                ['产品A', 'Q1', 80], ['产品A', 'Q2', 70], ['产品A', 'Q3', 65], ['产品A', 'Q4', 75],
+                ['产品B', 'Q1', 60], ['产品B', 'Q2', 85], ['产品B', 'Q3', 90], ['产品B', 'Q4', 55],
+                ['产品C', 'Q1', 45], ['产品C', 'Q2', 50], ['产品C', 'Q3', 75], ['产品C', 'Q4', 80],
+                ['产品D', 'Q1', 90], ['产品D', 'Q2', 65], ['产品D', 'Q3', 50], ['产品D', 'Q4', 85]
+              ],
+              itemStyle: { color: '#5470c6' }
+            },
+            {
+              name: '系列B',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                ['产品A', 'Q1', 70], ['产品A', 'Q2', 60], ['产品A', 'Q3', 55], ['产品A', 'Q4', 65],
+                ['产品B', 'Q1', 50], ['产品B', 'Q2', 75], ['产品B', 'Q3', 80], ['产品B', 'Q4', 45],
+                ['产品C', 'Q1', 35], ['产品C', 'Q2', 40], ['产品C', 'Q3', 65], ['产品C', 'Q4', 70],
+                ['产品D', 'Q1', 80], ['产品D', 'Q2', 55], ['产品D', 'Q3', 40], ['产品D', 'Q4', 75]
+              ],
+              itemStyle: { color: '#91cc75' }
+            },
+            {
+              name: '系列C',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                ['产品A', 'Q1', 60], ['产品A', 'Q2', 50], ['产品A', 'Q3', 45], ['产品A', 'Q4', 55],
+                ['产品B', 'Q1', 40], ['产品B', 'Q2', 65], ['产品B', 'Q3', 70], ['产品B', 'Q4', 35],
+                ['产品C', 'Q1', 25], ['产品C', 'Q2', 30], ['产品C', 'Q3', 55], ['产品C', 'Q4', 60],
+                ['产品D', 'Q1', 70], ['产品D', 'Q2', 45], ['产品D', 'Q3', 30], ['产品D', 'Q4', 65]
+              ],
+              itemStyle: { color: '#fac858' }
+            },
+            {
+              name: '系列D',
+              type: 'scatter',
+              coordinateSystem: 'matrix',
+              symbolSize: function (value) {
+                return value[2] * 0.5;
+              },
+              data: [
+                ['产品A', 'Q1', 50], ['产品A', 'Q2', 40], ['产品A', 'Q3', 35], ['产品A', 'Q4', 45],
+                ['产品B', 'Q1', 30], ['产品B', 'Q2', 55], ['产品B', 'Q3', 60], ['产品B', 'Q4', 25],
+                ['产品C', 'Q1', 15], ['产品C', 'Q2', 20], ['产品C', 'Q3', 45], ['产品C', 'Q4', 50],
+                ['产品D', 'Q1', 60], ['产品D', 'Q2', 35], ['产品D', 'Q3', 20], ['产品D', 'Q4', 55]
+              ],
+              itemStyle: { color: '#ee6666' }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景16的配置（日历坐标系自动布局测试）
+      function getOption16(enableAutoLayout, position, align, calendarLeft, calendarTop, calendarRight, calendarBottom) {
+        // 生成一个月的日期数据（固定数据）
+        function generateDateData(year, month, baseValue) {
+          var daysInMonth = new Date(year, month, 0).getDate();
+          var data = [];
+          for (var day = 1; day <= daysInMonth; day++) {
+            var dateStr = year + '-' + (month < 10 ? '0' + month : month) + '-' + (day < 10 ? '0' + day : day);
+            // 使用日期和baseValue生成固定但不同的值
+            var value = (baseValue + day * 3) % 100;
+            data.push([dateStr, value]);
+          }
+          return data;
+        }
+
+        var option = {
+          calendar: {
+            left: calendarLeft + '%',
+            top: calendarTop + '%',
+            right: calendarRight + '%',
+            bottom: calendarBottom + '%',
+            range: '2024-01',
+            cellSize: ['auto', 20],
+            dayLabel: {
+              show: true,
+              firstDay: 1
+            },
+            monthLabel: {
+              show: true
+            },
+            yearLabel: {
+              show: true
+            },
+            itemStyle: {
+              color: '#fff',
+              borderWidth: 1,
+              borderColor: '#ccc'
+            }
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 10),
+              itemStyle: { color: '#5470c6' }
+            },
+            {
+              name: '系列B',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 20),
+              itemStyle: { color: '#91cc75' }
+            },
+            {
+              name: '系列C',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 30),
+              itemStyle: { color: '#fac858' }
+            },
+            {
+              name: '系列D',
+              type: 'scatter',
+              coordinateSystem: 'calendar',
+              symbolSize: function (value) {
+                return value[1] * 0.3;
+              },
+              data: generateDateData(2024, 1, 40),
+              itemStyle: { color: '#ee6666' }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['系列A', '系列B', '系列C', '系列D'],
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['系列A', '系列B', '系列C', '系列D']
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景6的配置（分支图例的自动布局测试）
+      function getOption6(enableAutoLayout, position, align, treemapLeft, treemapTop, treemapWidth, treemapHeight) {
+        var branches = ['分支A', '分支B', '分支C', '分支D'];
+        var branchValues = [40, 30, 20, 10];
+
+        var option = {
+          series: branches.map(function (branchName, idx) {
+            var baseValue = branchValues[idx];
+            return {
+              name: branchName,
+              type: 'treemap',
+              left: treemapLeft + '%',
+              top: treemapTop + '%',
+              width: treemapWidth + '%',
+              height: treemapHeight + '%',
+              data: [
+                {
+                  name: branchName,
+                  value: baseValue,
+                  children: [
+                    { name: '子项' + branchName + '1', value: baseValue * 0.3 },
+                    { name: '子项' + branchName + '2', value: baseValue * 0.25 },
+                    { name: '子项' + branchName + '3', value: baseValue * 0.2 },
+                    { name: '子项' + branchName + '4', value: baseValue * 0.15 },
+                    { name: '子项' + branchName + '5', value: baseValue * 0.1 }
+                  ]
+                }
+              ],
+              breadcrumb: {
+                show: false
+              },
+              label: {
+                show: true,
+                position: 'inside'
+              },
+              itemStyle: {
+                borderColor: '#fff',
+                borderWidth: 2,
+                gapWidth: 2
+              },
+              levels: [
+                {
+                  itemStyle: {
+                    borderColor: '#777',
+                    borderWidth: 2,
+                    gapWidth: 2
+                  }
+                },
+                {
+                  itemStyle: {
+                    borderColor: '#555',
+                    borderWidth: 1,
+                    gapWidth: 1
+                  }
+                }
+              ]
+            };
+          })
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: branches,
+            selectedMode: 'single',
+            // 清除手动定位属性
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        } else {
+          option.legend = {
+            data: branches,
+            selectedMode: 'single'
+          };
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景17的配置（单visualMap的自动布局测试）
+      function getOption17(enableAutoLayout, position, align) {
+        // 生成热力图数据（使用固定数据）
+        var hours = ['12a', '1a', '2a', '3a', '4a', '5a', '6a',
+          '7a', '8a', '9a', '10a', '11a',
+          '12p', '1p', '2p', '3p', '4p', '5p',
+          '6p', '7p', '8p', '9p', '10p', '11p'];
+        var days = ['Saturday', 'Friday', 'Thursday',
+          'Wednesday', 'Tuesday', 'Monday', 'Sunday'];
+
+        // 使用固定的种子数据，确保每次生成的数据一致
+        var seed = 12345;
+        function random() {
+          seed = (seed * 9301 + 49297) % 233280;
+          return seed / 233280;
+        }
+
+        var data = [];
+        for (var i = 0; i < 7; i++) {
+          for (var j = 0; j < 24; j++) {
+            data.push([j, i, Math.floor(random() * 100)]);
+          }
+        }
+
+        var option = {
+          tooltip: {
+            position: 'top'
+          },
+          grid: {
+            height: '100%',
+            top: '0'
+          },
+          xAxis: {
+            type: 'category',
+            data: hours,
+            splitArea: {
+              show: true
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: days,
+            splitArea: {
+              show: true
+            }
+          },
+          visualMap: {
+            min: 0,
+            max: 100,
+            calculable: true,
+            orient: 'horizontal',
+            left: 'center',
+            top: '65%'
+          },
+          series: [{
+            name: '热力图数据',
+            type: 'heatmap',
+            data: data,
+            label: {
+              show: true
+            },
+            emphasis: {
+              itemStyle: {
+                shadowBlur: 10,
+                shadowColor: 'rgba(0, 0, 0, 0.5)'
+              }
+            }
+          }]
+        };
+
+        if (enableAutoLayout) {
+          option.visualMap.autoLayout = {
+            enable: true,
+            position: position,
+            align: align
+          };
+          // 清除手动定位属性
+          option.visualMap.left = undefined;
+          option.visualMap.right = undefined;
+          option.visualMap.top = undefined;
+          option.visualMap.bottom = undefined;
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景18的配置（多visualMap的自动布局测试）
+      function getOption18(enableAutoLayout, position, align, layoutMode) {
+        // 生成散点图数据（使用固定数据）
+        var seed1 = 12345;
+        var seed2 = 54321;
+        function random1() {
+          seed1 = (seed1 * 9301 + 49297) % 233280;
+          return seed1 / 233280;
+        }
+        function random2() {
+          seed2 = (seed2 * 9301 + 49297) % 233280;
+          return seed2 / 233280;
+        }
+
+        var data1 = [];
+        var data2 = [];
+        for (var i = 0; i < 100; i++) {
+          data1.push([
+            random1() * 100,
+            random1() * 100,
+            random1() * 100
+          ]);
+          data2.push([
+            random2() * 100,
+            random2() * 100,
+            random2() * 100
+          ]);
+        }
+
+        var option = {
+          grid: [
+            {
+              left: '10%',
+              right: '55%',
+              top: '10%',
+              bottom: '10%'
+            },
+            {
+              left: '55%',
+              right: '10%',
+              top: '10%',
+              bottom: '10%'
+            }
+          ],
+          xAxis: [
+            {
+              gridIndex: 0,
+              type: 'value'
+            },
+            {
+              gridIndex: 1,
+              type: 'value'
+            }
+          ],
+          yAxis: [
+            {
+              gridIndex: 0,
+              type: 'value'
+            },
+            {
+              gridIndex: 1,
+              type: 'value'
+            }
+          ],
+          visualMap: [
+            {
+              min: 0,
+              max: 100,
+              calculable: true,
+              orient: 'horizontal',
+              seriesIndex: 0,
+              dimension: 2,
+              inRange: {
+                color: ['#50a3ba', '#eac736', '#d94e5d']
+              }
+            },
+            {
+              min: 0,
+              max: 100,
+              calculable: true,
+              orient: 'vertical',
+              seriesIndex: 1,
+              dimension: 2,
+              inRange: {
+                color: ['#d4ee5f', '#2879b9', '#c3284d']
+              }
+            }
+          ],
+          series: [
+            {
+              name: '散点图1',
+              type: 'scatter',
+              xAxisIndex: 0,
+              yAxisIndex: 0,
+              symbolSize: function (data) {
+                return data[2] * 0.5;
+              },
+              data: data1
+            },
+            {
+              name: '散点图2',
+              type: 'scatter',
+              xAxisIndex: 1,
+              yAxisIndex: 1,
+              symbolSize: function (data) {
+                return data[2] * 0.5;
+              },
+              data: data2
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.visualMap[0].autoLayout = {
+            enable: true,
+            position: position,
+            align: align,
+            layoutMode: layoutMode
+          };
+          option.visualMap[1].autoLayout = {
+            enable: true,
+            position: position,
+            align: align,
+            layoutMode: layoutMode
+          };
+          // 清除手动定位属性
+          option.visualMap[0].left = undefined;
+          option.visualMap[0].right = undefined;
+          option.visualMap[0].top = undefined;
+          option.visualMap[0].bottom = undefined;
+          option.visualMap[1].left = undefined;
+          option.visualMap[1].right = undefined;
+          option.visualMap[1].top = undefined;
+          option.visualMap[1].bottom = undefined;
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景19的配置（分段型 visualMap 的自动布局测试）
+      function getOption19(enableAutoLayout, position, align, orient) {
+        // 生成散点图数据（使用固定数据）
+        var seed = 12345;
+        function random() {
+          seed = (seed * 9301 + 49297) % 233280;
+          return seed / 233280;
+        }
+
+        var data = [];
+        for (var i = 0; i < 100; i++) {
+          data.push([
+            random() * 100,
+            random() * 100,
+            random() * 100
+          ]);
+        }
+
+        var option = {
+          grid: {
+            top: '5%',
+            bottom: '5%',
+            left: '10%',
+            right: '10%'
+          },
+          xAxis: {
+            type: 'value'
+          },
+          yAxis: {
+            type: 'value'
+          },
+          visualMap: {
+            type: 'piecewise',
+            min: 0,
+            max: 100,
+            orient: orient,
+            dimension: 2,
+            pieces: [
+              { min: 0, max: 25, color: '#5470c6' },
+              { min: 25, max: 50, color: '#91cc75' },
+              { min: 50, max: 75, color: '#fac858' },
+              { min: 75, max: 100, color: '#ee6666' }
+            ],
+            left: 'center',
+            top: 'bottom'
+          },
+          series: [{
+            name: '散点图',
+            type: 'scatter',
+            symbolSize: function (data) {
+              return data[2] * 0.5;
+            },
+            data: data
+          }]
+        };
+
+        if (enableAutoLayout) {
+          option.visualMap.autoLayout = {
+            enable: true,
+            position: position,
+            align: align
+          };
+          // 清除手动定位属性
+          option.visualMap.left = undefined;
+          option.visualMap.right = undefined;
+          option.visualMap.top = undefined;
+          option.visualMap.bottom = undefined;
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景20的配置（可滚动分段型 visualMap 的自动布局测试）
+      function getOption20(enableAutoLayout, position, align, layoutMode, visualMap1Count, visualMap2Count) {
+        // 生成散点图数据（使用固定数据）
+        var seed1 = 12345;
+        var seed2 = 54321;
+        function random1() {
+          seed1 = (seed1 * 9301 + 49297) % 233280;
+          return seed1 / 233280;
+        }
+        function random2() {
+          seed2 = (seed2 * 9301 + 49297) % 233280;
+          return seed2 / 233280;
+        }
+
+        var data1 = [];
+        var data2 = [];
+        for (var i = 0; i < 100; i++) {
+          data1.push([
+            random1() * 100,
+            random1() * 100,
+            random1() * 100
+          ]);
+          data2.push([
+            random2() * 100,
+            random2() * 100,
+            random2() * 100
+          ]);
+        }
+
+        // 预设颜色数组
+        var colors = [
+          '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+          '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#5470c6',
+          '#d4ee5f', '#2879b9', '#c3284d', '#ff6b6b', '#4ecdc4',
+          '#95e1d3', '#f38181', '#aa96da', '#fcbad3', '#a8e6cf'
+        ];
+
+        // 生成 visualMap1 的 pieces
+        visualMap1Count = visualMap1Count ?? 24;
+        var pieces1 = [];
+        var step1 = 100 / visualMap1Count;
+        for (var i = 0; i < visualMap1Count; i++) {
+          pieces1.push({
+            min: i * step1,
+            max: (i + 1) * step1,
+            color: colors[i % colors.length]
+          });
+        }
+
+        // 生成 visualMap2 的 pieces
+        visualMap2Count = visualMap2Count ?? 24;
+        var pieces2 = [];
+        var step2 = 100 / visualMap2Count;
+        for (var i = 0; i < visualMap2Count; i++) {
+          pieces2.push({
+            min: i * step2,
+            max: (i + 1) * step2,
+            color: colors[(i + 10) % colors.length]
+          });
+        }
+
+        var option = {
+          grid: [
+            {
+              left: '10%',
+              right: '55%',
+              top: '5%',
+              bottom: '5%'
+            },
+            {
+              left: '55%',
+              right: '10%',
+              top: '5%',
+              bottom: '5%'
+            }
+          ],
+          xAxis: [
+            {
+              gridIndex: 0,
+              type: 'value'
+            },
+            {
+              gridIndex: 1,
+              type: 'value'
+            }
+          ],
+          yAxis: [
+            {
+              gridIndex: 0,
+              type: 'value'
+            },
+            {
+              gridIndex: 1,
+              type: 'value'
+            }
+          ],
+          visualMap: [],
+          series: [
+            {
+              name: '散点图1',
+              type: 'scatter',
+              xAxisIndex: 0,
+              yAxisIndex: 0,
+              symbolSize: function (data) {
+                return data[2] * 0.5;
+              },
+              data: data1
+            },
+            {
+              name: '散点图2',
+              type: 'scatter',
+              xAxisIndex: 1,
+              yAxisIndex: 1,
+              symbolSize: function (data) {
+                return data[2] * 0.5;
+              },
+              data: data2
+            }
+          ]
+        };
+
+        // 添加 visualMap1
+        if (visualMap1Count > 0) {
+          var visualMap1 = {
+            type: 'scrollPiecewise',
+            min: 0,
+            max: 100,
+            orient: 'horizontal',
+            seriesIndex: 0,
+            dimension: 2,
+            pieces: pieces1,
+            left: 'center',
+            top: 'bottom',
+            padding: 5
+          };
+          if (enableAutoLayout) {
+            visualMap1.autoLayout = {
+              enable: true,
+              position: position,
+              align: align,
+              layoutMode: layoutMode
+            };
+            visualMap1.left = undefined;
+            visualMap1.right = undefined;
+            visualMap1.top = undefined;
+            visualMap1.bottom = undefined;
+          }
+          option.visualMap.push(visualMap1);
+        }
+
+        // 添加 visualMap2
+        if (visualMap2Count > 0) {
+          var visualMap2 = {
+            type: 'scrollPiecewise',
+            min: 0,
+            max: 100,
+            orient: 'horizontal',
+            seriesIndex: 1,
+            dimension: 2,
+            pieces: pieces2,
+            left: 'center',
+            top: 'bottom',
+            padding: 5
+          };
+          if (enableAutoLayout) {
+            visualMap2.autoLayout = {
+              enable: true,
+              position: position,
+              align: align,
+              layoutMode: layoutMode
+            };
+            visualMap2.left = undefined;
+            visualMap2.right = undefined;
+            visualMap2.top = undefined;
+            visualMap2.bottom = undefined;
+          }
+          option.visualMap.push(visualMap2);
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景21的配置（图例和visualMap混合自动布局测试）
+      function getOption21(enableAutoLayout, position, align, layoutMode, legendCount, visualMapCount) {
+        // 生成系列数据
+        var series = [];
+        var legendData = [];
+
+        // 创建指定数量的系列
+        for (var i = 0; i < legendCount; i++) {
+          var seriesName = '系列' + String.fromCharCode(65 + i); // A, B, C...
+          series.push({
+            name: seriesName,
+            type: 'scatter',
+            data: generateScatterData(50, i * 20) // 每个系列50个点，位置错开
+          });
+          legendData.push(seriesName);
+        }
+
+        // 辅助函数：生成散点数据
+        function generateScatterData(count, offset) {
+          var data = [];
+          var seed = 12345 + offset;
+          function random() {
+            seed = (seed * 9301 + 49297) % 233280;
+            return seed / 233280;
+          }
+
+          for (var i = 0; i < count; i++) {
+            data.push([
+              random() * 100 + offset,
+              random() * 100,
+              random() * 100 // 用于visualMap映射的值
+            ]);
+          }
+          return data;
+        }
+
+
+        var option = {
+          grid: {
+            top: '10%',
+            bottom: '10%',
+            left: '10%',
+            right: '10%'
+          },
+          xAxis: {
+            type: 'value'
+          },
+          yAxis: {
+            type: 'value'
+          },
+          visualMap: [],
+          series: series
+        };
+
+        // 生成 visualMap
+        visualMapCount = visualMapCount ?? 6;
+        if (visualMapCount > 0) {
+          var pieces = [];
+          var step = 100 / visualMapCount;
+          var colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#5470c6',
+            '#d4ee5f', '#2879b9', '#c3284d', '#ff6b6b', '#4ecdc4', '#95e1d3', '#f38181', '#aa96da', '#fcbad3', '#a8e6cf'];
+          for (var i = 0; i < visualMapCount; i++) {
+            pieces.push({
+              min: i * step,
+              max: (i + 1) * step,
+              color: colors[i % colors.length]
+            });
+          }
+
+          var visualMap = {
+            type: 'scrollPiecewise',
+            min: 0,
+            max: 100,
+            dimension: 2,
+            orient: 'horizontal',
+            left: 'center',
+            top: 'bottom',
+            pieces: pieces,
+            padding: 5
+          };
+
+          if (enableAutoLayout) {
+            visualMap.autoLayout = {
+              enable: true,
+              position: position,
+              align: align,
+              layoutMode: layoutMode
+            };
+            visualMap.left = undefined;
+            visualMap.right = undefined;
+            visualMap.top = undefined;
+            visualMap.bottom = undefined;
+          }
+
+          option.visualMap.push(visualMap);
+        }
+
+        // 配置legend和visualMap
+        if (enableAutoLayout) {
+          option.legend = {
+            type: 'scroll',
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align,
+              layoutMode: layoutMode
+            },
+            data: legendData,
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+
+          // visualMap的autoLayout配置已经在上面设置了，这里不需要额外处理
+        } else {
+          option.legend = {
+            data: legendData
+          };
+          // visualMap保持默认配置（无autoLayout）
+        }
+
+        return option;
+      }
+
+      // 辅助函数：生成场景22的配置（坐标系和饼图混合布局测试）
+      function getOption22(enableAutoLayout, position, align, barLeft, barTop, barWidth, barHeight, pieLeft, pieTop, pieRadius) {
+        var option = {
+          // Grid配置（用于柱形图）
+          grid: [
+            {
+              left: barLeft + '%',
+              top: barTop + '%',
+              width: barWidth + '%',
+              height: barHeight + '%'
+            }
+          ],
+          // 坐标轴配置
+          xAxis: [
+            {
+              type: 'category',
+              gridIndex: 0,
+              data: ['一月', '二月', '三月', '四月', '五月', '六月'],
+              position: 'bottom'
+            }
+          ],
+          yAxis: [
+            {
+              type: 'value',
+              gridIndex: 0
+            }
+          ],
+          series: [
+            // 柱形图系列（使用坐标系）
+            {
+              name: '销售额',
+              type: 'bar',
+              xAxisIndex: 0,
+              yAxisIndex: 0,
+              data: [120, 200, 150, 80, 70, 110],
+              itemStyle: {
+                color: '#5470c6'
+              }
+            },
+            // 饼图系列（不使用坐标系）
+            {
+              name: '销售占比',
+              type: 'pie',
+              radius: pieRadius + '%',
+              center: [pieLeft + '%', pieTop + '%'],
+              data: [
+                { value: 120, name: '产品A' },
+                { value: 200, name: '产品B' },
+                { value: 150, name: '产品C' },
+                { value: 80, name: '产品D' },
+                { value: 70, name: '产品E' },
+                { value: 110, name: '产品F' }
+              ],
+              itemStyle: {
+                borderRadius: 8,
+                borderColor: '#fff',
+                borderWidth: 2
+              },
+              label: {
+                show: true,
+                formatter: '{b}: {d}%'
+              }
+            }
+          ]
+        };
+
+        if (enableAutoLayout) {
+          option.legend = {
+            autoLayout: {
+              enable: true,
+              position: position,
+              align: align
+            },
+            data: ['销售额', '销售占比'],
+            // 清除手动定位属性
+            left: undefined,
+            right: undefined,
+            top: undefined,
+            bottom: undefined
+          };
+        }
+        else {
+          option.legend = {
+            data: ['销售额', '销售占比']
+          };
+        }
+
+        return option;
+      }
+
+      // 单图例的自动布局
+      var chart0 = testHelper.create(echarts, 'single-legend-auto-layout', {
+        title: '单图例的自动布局',
+        option: getOption0(true, 'bottom', 'center', true),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart0, getOption0, chart0Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart0, getOption0, chart0Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart0, getOption0, chart0Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '显示轴标题',
+            id: 'showAxisName',
+            values: [false, true],
+            options: [
+              { text: '隐藏', value: false },
+              { text: '显示', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart0, getOption0, chart0Names);
+            }
+          }
+        ]
+      });
+
+      // 多图例的自动布局
+      var chart1 = testHelper.create(echarts, 'multi-legend-auto-layout', {
+        title: '多图例的自动布局',
+        option: getOption1(true, 'right', 'center', 'multiLine', 26, 3),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'right',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['singleLine', 'multiLine'],
+            options: [
+              { text: '单行布局', value: 'singleLine' },
+              { text: '多行布局', value: 'multiLine' }
+            ],
+            value: 'multiLine',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '图例1数量',
+            id: 'legend1Count',
+            min: 1,
+            max: 30,
+            value: 26,
+            step: 1,
+            suffix: '个',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '图例2数量',
+            id: 'legend2Count',
+            min: 1,
+            max: 30,
+            value: 3,
+            step: 1,
+            suffix: '个',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          }
+        ]
+      });
+
+      // 空间不足时图例挤压grid的测试
+      var chart2 = testHelper.create(echarts, 'space-insufficient-auto-layout', {
+        title: '空间不足时图例挤压grid测试',
+        option: getOption2(true, 'bottom', 'center', 'multiLine'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['singleLine', 'multiLine'],
+            options: [
+              { text: '单行布局', value: 'singleLine' },
+              { text: '多行布局', value: 'multiLine' }
+            ],
+            value: 'multiLine',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          }
+        ]
+      });
+
+      // 多grid双向条形图的自动布局
+      var chart3 = testHelper.create(echarts, 'multi-grid-auto-layout', {
+        title: '多grid双向条形图自动布局',
+        option: getOption3(true, 'bottom', 'center', 3, 53, 10, 10, 53, 3, 10, 10),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: 'Grid1 (左侧) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Grid1 Left',
+            id: 'grid1Left',
+            min: 0,
+            max: 50,
+            value: 3,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid1 Right',
+            id: 'grid1Right',
+            min: 50,
+            max: 100,
+            value: 53,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid1 Top',
+            id: 'grid1Top',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid1 Bottom',
+            id: 'grid1Bottom',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: 'Grid2 (右侧) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Grid2 Left',
+            id: 'grid2Left',
+            min: 50,
+            max: 100,
+            value: 53,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid2 Right',
+            id: 'grid2Right',
+            min: 0,
+            max: 50,
+            value: 3,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid2 Top',
+            id: 'grid2Top',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Grid2 Bottom',
+            id: 'grid2Bottom',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart3, getOption3, chart3Names);
+            }
+          }
+        ]
+      });
+
+      // 双饼图的自动布局测试
+      var chart4 = testHelper.create(echarts, 'dual-pie-auto-layout', {
+        title: '双饼图的自动布局测试',
+        option: getOption4(true, 'bottom', 'center', 40, 50, 90, 65, 50, 90),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '饼图1 (流量来源) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Pie1 Left',
+            id: 'pie1Left',
+            min: 0,
+            max: 100,
+            value: 40,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie1 Top',
+            id: 'pie1Top',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie1 Radius',
+            id: 'pie1Radius',
+            min: 5,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '饼图2 (设备类型) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Pie2 Left',
+            id: 'pie2Left',
+            min: 60,
+            max: 100,
+            value: 65,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie2 Top',
+            id: 'pie2Top',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie2 Radius',
+            id: 'pie2Radius',
+            min: 5,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart4, getOption4, chart4Names);
+            }
+          },
+        ]
+      });
+
+      // 树图的自动布局测试
+      var chart5 = testHelper.create(echarts, 'tree-auto-layout', {
+        title: '树图的自动布局测试',
+        option: getOption5(true, 'bottom', 'center', 10, 5, 80, 90),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '树图位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Tree Left',
+            id: 'treeLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Tree Top',
+            id: 'treeTop',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Tree Width',
+            id: 'treeWidth',
+            min: 30,
+            max: 100,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Tree Height',
+            id: 'treeHeight',
+            min: 30,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart5, getOption5, chart5Names);
+            }
+          }
+        ]
+      });
+
+      // 分支图例的自动布局测试
+      var chart6 = testHelper.create(echarts, 'treemap-auto-layout', {
+        title: '分支图例的自动布局测试',
+        option: getOption6(true, 'bottom', 'center', 10, 5, 80, 85),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '矩形树图位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Treemap Left',
+            id: 'treemapLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Treemap Top',
+            id: 'treemapTop',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Treemap Width',
+            id: 'treemapWidth',
+            min: 30,
+            max: 100,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Treemap Height',
+            id: 'treemapHeight',
+            min: 30,
+            max: 100,
+            value: 85,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart6, getOption6, chart6Names);
+            }
+          }
+        ]
+      });
+
+      // 双雷达图的自动布局测试
+      var chart7 = testHelper.create(echarts, 'dual-radar-auto-layout', {
+        title: '双雷达图的自动布局测试',
+        option: getOption7(true, 'bottom', 'center', 40, 55, 85, 65, 55, 85),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '雷达图1 (技术指标) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Radar1 Left',
+            id: 'radar1Left',
+            min: 0,
+            max: 100,
+            value: 40,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Radar1 Top',
+            id: 'radar1Top',
+            min: 0,
+            max: 100,
+            value: 55,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Radar1 Radius',
+            id: 'radar1Radius',
+            min: 10,
+            max: 100,
+            value: 85,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '雷达图2 (业务指标) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Radar2 Left',
+            id: 'radar2Left',
+            min: 0,
+            max: 100,
+            value: 65,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Radar2 Top',
+            id: 'radar2Top',
+            min: 0,
+            max: 100,
+            value: 55,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Radar2 Radius',
+            id: 'radar2Radius',
+            min: 10,
+            max: 100,
+            value: 85,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart7, getOption7, chart7Names);
+            }
+          }
+        ]
+      });
+
+      // 双漏斗图的自动布局测试
+      var chart8 = testHelper.create(echarts, 'funnel-auto-layout', {
+        title: '双漏斗图的自动布局测试',
+        option: getOption8(true, 'bottom', 'center', 10, 10, 35, 80, 55, 10, 35, 80),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '漏斗图1 (流量漏斗) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Funnel1 Left',
+            id: 'funnel1Left',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel1 Top',
+            id: 'funnel1Top',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel1 Width',
+            id: 'funnel1Width',
+            min: 20,
+            max: 50,
+            value: 35,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel1 Height',
+            id: 'funnel1Height',
+            min: 30,
+            max: 90,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '漏斗图2 (转化漏斗) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Funnel2 Left',
+            id: 'funnel2Left',
+            min: 50,
+            max: 100,
+            value: 55,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel2 Top',
+            id: 'funnel2Top',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel2 Width',
+            id: 'funnel2Width',
+            min: 20,
+            max: 50,
+            value: 35,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Funnel2 Height',
+            id: 'funnel2Height',
+            min: 30,
+            max: 90,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart8, getOption8, chart8Names);
+            }
+          }
+        ]
+      });
+
+      // 双仪表盘的自动布局测试
+      var chart9 = testHelper.create(echarts, 'gauge-auto-layout', {
+        title: '双仪表盘的自动布局测试',
+        option: getOption9(true, 'bottom', 'center', 30, 55, 100, 70, 55, 100),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '仪表盘1 (仪表盘A) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Gauge1 CenterX',
+            id: 'gauge1CenterX',
+            min: 0,
+            max: 100,
+            value: 30,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Gauge1 CenterY',
+            id: 'gauge1CenterY',
+            min: 0,
+            max: 100,
+            value: 55,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Gauge1 Radius',
+            id: 'gauge1Radius',
+            min: 0,
+            max: 100,
+            value: 100,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '仪表盘2 (仪表盘B) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Gauge2 CenterX',
+            id: 'gauge2CenterX',
+            min: 0,
+            max: 100,
+            value: 70,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Gauge2 CenterY',
+            id: 'gauge2CenterY',
+            min: 0,
+            max: 100,
+            value: 55,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Gauge2 Radius',
+            id: 'gauge2Radius',
+            min: 0,
+            max: 100,
+            value: 100,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart9, getOption9, chart9Names);
+            }
+          }
+        ]
+      });
+
+      // 双和弦图的自动布局测试
+      var chart10 = testHelper.create(echarts, 'chord-auto-layout', {
+        title: '双和弦图的自动布局测试',
+        option: getOption10(true, 'bottom', 'center', 30, 50, 90, 70, 50, 90),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '和弦图A (北京/上海/广州/深圳/天津/重庆/南京) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Chord1 CenterX',
+            id: 'chord1CenterX',
+            min: 10,
+            max: 50,
+            value: 30,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Chord1 CenterY',
+            id: 'chord1CenterY',
+            min: 30,
+            max: 70,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Chord1 Radius',
+            id: 'chord1Radius',
+            min: 20,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '和弦图B (杭州/南京/苏州/无锡/宁波/温州/绍兴/嘉兴) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Chord2 CenterX',
+            id: 'chord2CenterX',
+            min: 50,
+            max: 90,
+            value: 70,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Chord2 CenterY',
+            id: 'chord2CenterY',
+            min: 30,
+            max: 70,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Chord2 Radius',
+            id: 'chord2Radius',
+            min: 20,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart10, getOption10, chart10Names);
+            }
+          }
+        ]
+      });
+
+      // 力导向图的自动布局测试
+      var chart11 = testHelper.create(echarts, 'graph-auto-layout', {
+        title: 'Les Miserables力导向图自动布局测试',
+        option: getOption11(true, 'bottom', 'center', 10, 10, 80, 80),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '力导向图位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Graph Left',
+            id: 'graphLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Graph Top',
+            id: 'graphTop',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Graph Width',
+            id: 'graphWidth',
+            min: 50,
+            max: 100,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Graph Height',
+            id: 'graphHeight',
+            min: 50,
+            max: 100,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart11, getOption11, chart11Names);
+            }
+          }
+        ]
+      });
+
+      // 多极坐标系自动布局测试
+      var chart12Names = [
+        'enableAutoLayout', 'position', 'align',
+        'polar1CenterX', 'polar1CenterY', 'polar1Radius',
+        'polar2CenterX', 'polar2CenterY', 'polar2Radius',
+        'legend1Count', 'legend2Count'
+      ];
+      var chart13Names = [
+        'enableAutoLayout', 'position', 'align',
+        'singleLeft', 'singleTop', 'singleRight', 'singleBottom',
+        'horizontalAxisPosition'
+      ];
+      var chart14Names = [
+        'enableAutoLayout', 'position', 'align',
+        'singleLeft', 'singleTop', 'singleRight', 'singleBottom',
+        'verticalAxisPosition'
+      ];
+      var chart15Names = [
+        'enableAutoLayout', 'position', 'align',
+        'matrixLeft', 'matrixTop', 'matrixRight', 'matrixBottom'
+      ];
+      var chart16Names = [
+        'enableAutoLayout', 'position', 'align',
+        'calendarLeft', 'calendarTop', 'calendarRight', 'calendarBottom'
+      ];
+      var chart12 = testHelper.create(echarts, 'polar-bar-auto-layout', {
+        title: '多极坐标系自动布局测试',
+        option: getOption12(true, 'bottom', 'center', 40, 50, 90, 65, 50, 90, 1, 1),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '极坐标系1 (工作日数据) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Polar1 Left',
+            id: 'polar1CenterX',
+            min: 0,
+            max: 100,
+            value: 40,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Polar1 Top',
+            id: 'polar1CenterY',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Polar1 Radius',
+            id: 'polar1Radius',
+            min: 5,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '极坐标系2 (季节数据) 位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Polar2 Left',
+            id: 'polar2CenterX',
+            min: 60,
+            max: 100,
+            value: 65,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Polar2 Top',
+            id: 'polar2CenterY',
+            min: 0,
+            max: 100,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Polar2 Radius',
+            id: 'polar2Radius',
+            min: 5,
+            max: 100,
+            value: 90,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '图例系列数量控制'
+          },
+          {
+            type: 'range',
+            text: '图例1系列数量',
+            id: 'legend1Count',
+            min: 0,
+            max: 5,
+            value: 1,
+            step: 1,
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '图例2系列数量',
+            id: 'legend2Count',
+            min: 0,
+            max: 5,
+            value: 1,
+            step: 1,
+            onchange: function () {
+              handleOptionChange(chart12, getOption12, chart12Names);
+            }
+          }
+        ]
+      });
+
+      // 水平单轴坐标系自动布局测试
+      var chart13 = testHelper.create(echarts, 'single-axis-horizontal-auto-layout', {
+        title: '水平单轴坐标系自动布局测试',
+        option: getOption13(true, 'bottom', 'center', 10, 5, 10, 5, 'bottom'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '单轴位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Single Left',
+            id: 'singleLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Top',
+            id: 'singleTop',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Right',
+            id: 'singleRight',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Bottom',
+            id: 'singleBottom',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '轴位置控制（水平轴只能使用top或bottom）'
+          },
+          {
+            type: 'select',
+            text: '轴位置',
+            id: 'horizontalAxisPosition',
+            values: ['top', 'bottom'],
+            options: [
+              { text: '顶部', value: 'top' },
+              { text: '底部', value: 'bottom' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart13, getOption13, chart13Names);
+            }
+          }
+        ]
+      });
+
+      // 垂直单轴坐标系自动布局测试
+      var chart14 = testHelper.create(echarts, 'single-axis-vertical-auto-layout', {
+        title: '垂直单轴坐标系自动布局测试',
+        option: getOption14(true, 'right', 'center', 5, 10, 5, 10, 'right'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'right',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '单轴位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Single Left',
+            id: 'singleLeft',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Top',
+            id: 'singleTop',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Right',
+            id: 'singleRight',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Single Bottom',
+            id: 'singleBottom',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '轴位置控制（垂直轴只能使用left或right）'
+          },
+          {
+            type: 'select',
+            text: '轴位置',
+            id: 'verticalAxisPosition',
+            values: ['left', 'right'],
+            options: [
+              { text: '左侧', value: 'left' },
+              { text: '右侧', value: 'right' }
+            ],
+            value: 'right',
+            onchange: function () {
+              handleOptionChange(chart14, getOption14, chart14Names);
+            }
+          }
+        ]
+      });
+
+      // 矩阵坐标系自动布局测试
+      var chart15 = testHelper.create(echarts, 'matrix-auto-layout', {
+        title: '矩阵坐标系自动布局测试',
+        option: getOption15(true, 'bottom', 'center', 10, 5, 10, 5),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '矩阵位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Matrix Left',
+            id: 'matrixLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Matrix Top',
+            id: 'matrixTop',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Matrix Right',
+            id: 'matrixRight',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Matrix Bottom',
+            id: 'matrixBottom',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart15, getOption15, chart15Names);
+            }
+          }
+        ]
+      });
+
+      // 日历坐标系自动布局测试
+      var chart16 = testHelper.create(echarts, 'calendar-auto-layout', {
+        title: '日历坐标系自动布局测试',
+        option: getOption16(true, 'bottom', 'center', 10, 10, 10, 5),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '日历位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Calendar Left',
+            id: 'calendarLeft',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Top',
+            id: 'calendarTop',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Right',
+            id: 'calendarRight',
+            min: 0,
+            max: 50,
+            value: 10,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Calendar Bottom',
+            id: 'calendarBottom',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function () {
+              handleOptionChange(chart16, getOption16, chart16Names);
+            }
+          }
+        ]
+      });
+
+      // 单visualMap的自动布局测试
+      var chart17 = testHelper.create(echarts, 'single-visualMap-auto-layout', {
+        title: '单visualMap的自动布局',
+        option: getOption17(true, 'bottom', 'center'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart17, getOption17, chart17Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart17, getOption17, chart17Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart17, getOption17, chart17Names);
+            }
+          }
+        ]
+      });
+
+      // 多visualMap的自动布局测试
+      var chart18 = testHelper.create(echarts, 'multi-visualMap-auto-layout', {
+        title: '多visualMap的自动布局',
+        option: getOption18(true, 'bottom', 'center', 'singleLine'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart18, getOption18, chart18Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart18, getOption18, chart18Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart18, getOption18, chart18Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['singleLine', 'multiLine'],
+            options: [
+              { text: '单行布局', value: 'singleLine' },
+              { text: '多行布局', value: 'multiLine' }
+            ],
+            value: 'singleLine',
+            onchange: function () {
+              handleOptionChange(chart18, getOption18, chart18Names);
+            }
+          }
+        ]
+      });
+
+      // 分段型 visualMap 的自动布局测试
+      var chart19 = testHelper.create(echarts, 'piecewise-visualMap-auto-layout', {
+        title: '分段型 visualMap 的自动布局',
+        option: getOption19(true, 'bottom', 'center', 'horizontal'),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart19, getOption19, chart19Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart19, getOption19, chart19Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart19, getOption19, chart19Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '方向',
+            id: 'orient',
+            values: ['horizontal', 'vertical'],
+            options: [
+              { text: '水平', value: 'horizontal' },
+              { text: '垂直', value: 'vertical' }
+            ],
+            value: 'horizontal',
+            onchange: function () {
+              handleOptionChange(chart19, getOption19, chart19Names);
+            }
+          }
+        ]
+      });
+
+      // 可滚动分段型 visualMap 的自动布局测试
+      var chart20 = testHelper.create(echarts, 'scroll-piecewise-visualMap-auto-layout', {
+        title: '可滚动分段型 visualMap 的自动布局',
+        option: getOption20(true, 'bottom', 'center', 'singleLine', 24, 24),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['singleLine', 'multiLine'],
+            options: [
+              { text: '单行布局', value: 'singleLine' },
+              { text: '多行布局', value: 'multiLine' }
+            ],
+            value: 'singleLine',
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'VisualMap1 分段数量',
+            id: 'visualMap1Count',
+            min: 5,
+            max: 30,
+            value: 24,
+            step: 1,
+            suffix: '个',
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'VisualMap2 分段数量',
+            id: 'visualMap2Count',
+            min: 5,
+            max: 30,
+            value: 24,
+            step: 1,
+            suffix: '个',
+            onchange: function () {
+              handleOptionChange(chart20, getOption20, chart20Names);
+            }
+          }
+        ]
+      });
+
+      // 图例和visualMap混合自动布局测试
+      var chart21 = testHelper.create(echarts, 'mixed-legend-visualMap-auto-layout', {
+        title: '图例和visualMap混合自动布局',
+        option: getOption21(true, 'bottom', 'center', 'multiLine', 3, 8),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['singleLine', 'multiLine'],
+            options: [
+              { text: '单行布局', value: 'singleLine' },
+              { text: '多行布局', value: 'multiLine' }
+            ],
+            value: 'multiLine',
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          },
+          {
+            type: 'range',
+            text: '图例系列数量',
+            id: 'legendCount',
+            min: 1,
+            max: 5,
+            value: 3,
+            step: 1,
+            suffix: '个',
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'visualMap 分段数量',
+            id: 'visualMapCount',
+            min: 2,
+            max: 20,
+            value: 8,
+            step: 1,
+            suffix: '段',
+            onchange: function () {
+              handleOptionChange(chart21, getOption21, chart21Names);
+            }
+          }
+        ]
+      });
+
+      // 坐标系和饼图混合布局的自动布局测试
+      var chart22 = testHelper.create(echarts, 'mixed-coordinate-pie-auto-layout', {
+        title: '坐标系和饼图混合布局测试',
+        option: getOption22(true, 'bottom', 'center', 5, 5, 40, 85, 70, 50, 80),
+        inputs: [
+          {
+            type: 'select',
+            text: '启用自动布局',
+            id: 'enableAutoLayout',
+            values: [false, true],
+            options: [
+              { text: '关闭', value: false },
+              { text: '开启', value: true }
+            ],
+            value: true,
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '位置',
+            id: 'position',
+            values: ['bottom', 'top', 'left', 'right'],
+            options: [
+              { text: '底部（水平排列）', value: 'bottom' },
+              { text: '顶部（水平排列）', value: 'top' },
+              { text: '左侧（垂直排列）', value: 'left' },
+              { text: '右侧（垂直排列）', value: 'right' }
+            ],
+            value: 'bottom',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '对齐',
+            id: 'align',
+            values: ['start', 'center', 'end'],
+            options: [
+              { text: '前对齐', value: 'start' },
+              { text: '居中对齐', value: 'center' },
+              { text: '后对齐', value: 'end' }
+            ],
+            value: 'center',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '柱形图位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Bar Left',
+            id: 'barLeft',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Bar Top',
+            id: 'barTop',
+            min: 0,
+            max: 50,
+            value: 5,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Bar Width',
+            id: 'barWidth',
+            min: 20,
+            max: 50,
+            value: 40,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Bar Height',
+            id: 'barHeight',
+            min: 50,
+            max: 90,
+            value: 85,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'hr',
+            text: '饼图位置控制'
+          },
+          {
+            type: 'range',
+            text: 'Pie Left',
+            id: 'pieLeft',
+            min: 50,
+            max: 100,
+            value: 70,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie Top',
+            id: 'pieTop',
+            min: 0,
+            max: 50,
+            value: 50,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          },
+          {
+            type: 'range',
+            text: 'Pie Radius',
+            id: 'pieRadius',
+            min: 10,
+            max: 85,
+            value: 80,
+            step: 1,
+            suffix: '%',
+            onchange: function() {
+              handleOptionChange(chart22, getOption22, chart22Names);
+            }
+          }
+        ]
+      });
+    })
+  </script>
+</body>
+
+</html>

@@ -42,6 +42,7 @@ import GridModel, { GridOption, OUTER_BOUNDS_CLAMP_DEFAULT, OUTER_BOUNDS_DEFAULT
 import CartesianAxisModel from './AxisModel';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
+import SeriesModel from '../../model/Series';
 import { Dictionary } from 'zrender/src/core/types';
 import {CoordinateSystemMaster} from '../CoordinateSystem';
 import { NullUndefined, ScaleDataValue } from '../../util/types';
@@ -70,6 +71,16 @@ import { error, log } from '../../util/log';
 import { AxisTickLabelComputingKind } from '../axisTickLabelBuilder';
 import { injectCoordSysByOption } from '../../core/CoordinateSystem';
 import { mathMax, parsePositionSizeOption } from '../../util/number';
+import {
+    LayoutLegendContext,
+    LegendAvoidableCoordinateSystem,
+    fillLegendGroupSpaceToMargin,
+    calculateRectWithAxisLabels,
+    calculateOuterBoundingRectWithLabels,
+    collectCoordLabelSeries,
+    calculateSeriesLabelBoundingRects,
+    calculateSymbolRect
+} from '../../util/autoLayout';
 
 type Cartesian2DDimensionName = 'x' | 'y';
 
@@ -87,7 +98,7 @@ const XY_TO_MARGIN_IDX = [
     [0, 2]  // xyIdx 1 => 'y'
 ] as const;
 
-class Grid implements CoordinateSystemMaster {
+class Grid implements CoordinateSystemMaster, LegendAvoidableCoordinateSystem {
 
     // FIXME:TS where used (different from registered type 'cartesian2d')?
     readonly type: string = 'grid';
@@ -97,6 +108,8 @@ class Grid implements CoordinateSystemMaster {
     private _axesMap: AxesMap = {} as AxesMap;
     private _axesList: Axis2D[] = [];
     private _rect: LayoutRect;
+    /** @implements LegendAvoidableCoordinateSystem */
+    public autoLayoutContext: LayoutLegendContext | undefined;
 
     readonly model: GridModel;
     readonly axisPointerEnabled = true;
@@ -115,6 +128,17 @@ class Grid implements CoordinateSystemMaster {
 
     getRect(): LayoutRect {
         return this._rect;
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    getOuterBoundingRect(): LayoutRect {
+        return this._rect;
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    applyAutoLayout(ecModel: GlobalModel, api: ExtensionAPI): void {
+        // 调用现有的 update 方法进行压缩布局计算（已包含系列标签压缩）
+        this.update(ecModel, api);
     }
 
     update(ecModel: GlobalModel, api: ExtensionAPI): void {
@@ -214,6 +238,12 @@ class Grid implements CoordinateSystemMaster {
         const axesMap = this._axesMap;
         const coordsList = this._coordsList;
 
+        // 收集需要自动压缩标签的系列（根据adaptiveLayout配置）
+        const adaptiveLayout = gridModel.get('adaptiveLayout');
+        const autoCompressSeries = adaptiveLayout
+            ? collectCoordLabelSeries(api.getModel(), this)
+            : undefined;
+
         const optionContainLabel = gridModel.get('containLabel'); // No `.get(, true)` for backward compat.
 
         updateAllAxisExtentTransByGridRect(axesMap, gridRect);
@@ -237,7 +267,8 @@ class Grid implements CoordinateSystemMaster {
                         );
                     }
                     noPxChange = layOutGridByOuterBounds(
-                        gridRect.clone(), 'axisLabel', null, gridRect, axesMap, axisBuilderSharedCtx, layoutRef
+                        gridRect.clone(), 'axisLabel', null, gridRect, axesMap, axisBuilderSharedCtx, layoutRef, api,
+                        this, autoCompressSeries
                     );
                 }
             }
@@ -249,7 +280,8 @@ class Grid implements CoordinateSystemMaster {
                     // console.time('layOutGridByOuterBounds');
                     noPxChange = layOutGridByOuterBounds(
                         outerBoundsRect, parsedOuterBoundsContain, outerBoundsClamp,
-                        gridRect, axesMap, axisBuilderSharedCtx, layoutRef
+                        gridRect, axesMap, axisBuilderSharedCtx, layoutRef, api,
+                        this, autoCompressSeries
                     );
                     // console.timeEnd('layOutGridByOuterBounds');
                 }
@@ -745,7 +777,10 @@ function layOutGridByOuterBounds(
     gridRect: LayoutRect,
     axesMap: AxesMap,
     axisBuilderSharedCtx: AxisBuilderSharedContext,
-    layoutRef: BoxLayoutReferenceResult
+    layoutRef: BoxLayoutReferenceResult,
+    api: ExtensionAPI,
+    grid: Grid,
+    autoCompressSeries?: SeriesModel[]
 ): boolean {
     if (__DEV__) {
         assert(outerBoundsContain === 'all' || outerBoundsContain === 'axisLabel');
@@ -767,7 +802,7 @@ function layOutGridByOuterBounds(
         layoutRef
     );
 
-    const margin = [0, 0, 0, 0];
+    let margin = [0, 0, 0, 0];
 
     fillLabelNameOverflowOnOneDimension(0);
     fillLabelNameOverflowOnOneDimension(1);
@@ -776,12 +811,91 @@ function layOutGridByOuterBounds(
     fillMarginOnOneDimension(gridRect, 0, NaN);
     fillMarginOnOneDimension(gridRect, 1, NaN);
 
-    const noPxChange = find(margin, item => item > 0) == null;
-    expandOrShrinkRect(gridRect, margin, true, true, outerBoundsClamp);
+    const autoLayoutContext = grid.autoLayoutContext;
+    let gridRectWithAxisLabels: LayoutRect;
+    if (autoLayoutContext != null) {
+        if (autoLayoutContext.needLayout) {
+            const labelBoundingRects = calculateCartesianSeriesLabelBoundingRects(
+                autoCompressSeries ?? collectCoordLabelSeries(api.getModel(), grid),
+                api
+            );
+            gridRectWithAxisLabels = calculateGridRectWithAxisLabels(
+                gridRect, axesMap, axisBuilderSharedCtx, labelBoundingRects
+            );
+            fillLegendGroupSpaceToMargin(
+                autoLayoutContext.group,
+                api,
+                gridRectWithAxisLabels,
+                margin,
+                autoLayoutContext
+            );
+        }
+        const contextMargin = autoLayoutContext.margin;
+        if (autoLayoutContext.margin != null) {
+            // 将计算好的margin应用到布局的margin中
+            margin[0] += contextMargin[0]; // top
+            margin[1] += contextMargin[1]; // right
+            margin[2] += contextMargin[2]; // bottom
+            margin[3] += contextMargin[3]; // left
+        }
+    }
 
+    let noPxChange = find(margin, item => item > 0) == null;
+    expandOrShrinkRect(gridRect, margin, true, true, outerBoundsClamp);
+    gridRectWithAxisLabels && expandOrShrinkRect(gridRectWithAxisLabels, margin, true, true, outerBoundsClamp);
     updateAllAxisExtentTransByGridRect(axesMap, gridRect);
 
+    // 需要在grid压缩完成后才能计算系列标签溢出，因为压缩会改变标签位置
+    if (autoCompressSeries && autoCompressSeries.length > 0) {
+        // 清空margin，重新计算系列标签溢出
+        margin = [0, 0, 0, 0];
+        const labelBoundingRects = calculateCartesianSeriesLabelBoundingRects(
+            autoCompressSeries,
+            api
+        );
+        fillSeriesLabelOverflowOnOneDimension(0, labelBoundingRects);
+        fillSeriesLabelOverflowOnOneDimension(1, labelBoundingRects);
+        if (find(margin, item => item > 0) != null) {
+            noPxChange = false;
+            expandOrShrinkRect(gridRect, margin, true, true, outerBoundsClamp);
+            gridRectWithAxisLabels && expandOrShrinkRect(gridRectWithAxisLabels, margin, true, true, outerBoundsClamp);
+            updateAllAxisExtentTransByGridRect(axesMap, gridRect);
+        }
+    }
+    // 在 grid 布局完成后，基于最终的 gridRect 计算用于图例避让的矩形
+    if (autoLayoutContext?.needLayout === true) {
+        autoLayoutContext.finalBoundingRect = gridRectWithAxisLabels;
+    }
     return noPxChange;
+
+    function calculateGridRectWithAxisLabels(
+        gridRect: LayoutRect,
+        axesMap: AxesMap,
+        axisBuilderSharedCtx: AxisBuilderSharedContext,
+        labelBoundingRects?: Array<{
+            rect: BoundingRect;
+            textAlign: string;
+        }>
+    ): LayoutRect {
+        // 使用通用的calculateRectWithAxisLabels方法
+        const unionRect = calculateRectWithAxisLabels(
+            gridRect, axesMap, axisBuilderSharedCtx
+        );
+
+        // 如果有系列标签边界矩形，进一步扩展矩形
+        if (labelBoundingRects && labelBoundingRects.length > 0) {
+            // 将标签边界矩形合并到最终矩形中
+            const extendedRect = calculateOuterBoundingRectWithLabels(
+                unionRect,
+                labelBoundingRects
+            );
+            (extendedRect as LayoutRect).margin = gridRect.margin;
+            return extendedRect as LayoutRect;
+        }
+
+        (unionRect as LayoutRect).margin = gridRect.margin;
+        return unionRect as LayoutRect;
+    }
 
     function fillLabelNameOverflowOnOneDimension(xyIdx: number): void {
         each(axesMap[XY[xyIdx]], axis => {
@@ -833,6 +947,29 @@ function layOutGridByOuterBounds(
         const maxIdx = XY_TO_MARGIN_IDX[xyIdx][1];
         margin[minIdx] = mathMax(margin[minIdx], overflow1);
         margin[maxIdx] = mathMax(margin[maxIdx], overflow2);
+    }
+
+    /**
+     * 针对系列标签（如 markPoint/markLine 之类），计算其超出坐标系边界的部分，并尝试相应地扩大坐标系的边界留白。
+     *
+     * @param xyIdx 当前维度索引（0 表示 x 轴，1 表示 y 轴）。
+     * @param labelBoundingRects 已提前计算好的标签包围盒列表，其中已包含 label 的排版和旋转等信息。
+     */
+    function fillSeriesLabelOverflowOnOneDimension(
+        xyIdx: number,
+        labelBoundingRects: Array<{
+            rect: BoundingRect;
+            textAlign: string;
+        }>
+    ): void {
+        // 遍历每一个由 autoLayout 返回的标签包围盒
+        each(labelBoundingRects, function (labelInfo) {
+            const positionedRect = labelInfo.rect;
+            // 对当前维度和正交维分别考虑标签溢出；proportion 设为 NaN 表示不缩放而是直接扩展即可
+            // 这样做可以涵盖多种 textAlign 和标签旋转情况，确保标签始终可见
+            fillMarginOnOneDimension(positionedRect, xyIdx, NaN);
+            fillMarginOnOneDimension(positionedRect, 1 - xyIdx, NaN);
+        });
     }
 
     function applyProportion(overflow: number, proportion: number): number {
@@ -991,5 +1128,79 @@ const resolveAxisNameOverlapForGrid: AxisBuilderSharedContext['resolveAxisNameOv
         });
     }
 };
+
+/**
+ * 计算笛卡尔坐标系系列标签边界矩形。
+ *
+ * @param seriesModels 系列模型列表
+ * @param api ExtensionAPI 实例
+ * @returns 标签边界矩形和对齐信息列表
+ */
+function calculateCartesianSeriesLabelBoundingRects(
+    seriesModels: SeriesModel[],
+    api: ExtensionAPI
+): Array<{
+    rect: BoundingRect;
+    textAlign: string;
+}> {
+    return calculateSeriesLabelBoundingRects(
+        seriesModels,
+        api,
+        (seriesModel, data) => {
+            // 获取当前系列所使用的笛卡尔坐标系对象，后续用于将 x/y 数据值映射为像素坐标
+            const cartesian = seriesModel.coordinateSystem as any; // Cartesian2D
+
+            // items 用于收集每个数据点的标签边界和相关信息
+            const items: Array<{
+                dataIndex: number;
+                point: number[];
+                symbolRect: BoundingRect;
+                labelText: string;
+            }> = [];
+
+            // 遍历每个数据点，逐一处理
+            data.each(function (idx: number) {
+                // 获取数据点的 x/y 值。如果缺失，说明该点无效，直接跳过。
+                const dataValue = data.getValues(['x', 'y'], idx);
+                if (dataValue[0] == null || dataValue[1] == null) {
+                    return;
+                }
+
+                // 将原始的 x/y 数据值通过笛卡尔系映射到像素坐标。若返回无效坐标则跳过。
+                const point = cartesian.dataToPoint(dataValue);
+                if (!point || point.length < 2) {
+                    // 可能由于数据越界或坐标系未初始化等原因导致映射失败，需跳过
+                    return;
+                }
+
+                // 获取当前数据点的标签文本内容（如显示值、分类名等）。
+                // 若未配置显示或内容为空，则该点无需生成标签边界。
+                const labelText = seriesModel.getFormattedLabel(idx, 'normal');
+                if (labelText == null || labelText === '') {
+                    return;
+                }
+
+                // 统一调用工具函数计算该数据点的标记符号的像素边界矩形（考虑不同 symbol 类型/大小等）
+                // symbolRect 将用于后续判断标签和图形的排布、碰撞等
+                const symbolRect = calculateSymbolRect(seriesModel, data, idx, point, api);
+                if (!symbolRect) {
+                    // 防御性判断，某些极端情况可能无法获得正常的矩形
+                    return;
+                }
+
+                // 收集当前数据点的标签/图形显示必要信息，用于最终统一布局与碰撞检测
+                items.push({
+                    dataIndex: idx,
+                    point: point,
+                    symbolRect: symbolRect,
+                    labelText: labelText
+                });
+            });
+
+            // 返回当前系列中所有有效数据点的信息，供后续批量计算标签布局用
+            return items;
+        }
+    );
+}
 
 export default Grid;

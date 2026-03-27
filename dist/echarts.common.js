@@ -19,10 +19,10 @@
 */
 
 (function (global, factory) {
-    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-    typeof define === 'function' && define.amd ? define(['exports'], factory) :
-    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.echarts = {}));
-}(this, (function (exports) { 'use strict';
+    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('zrender.js')) :
+    typeof define === 'function' && define.amd ? define(['exports', 'zrender.js'], factory) :
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.echarts = {}, global.zrender_js));
+}(this, (function (exports, zrender_js) { 'use strict';
 
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation.
@@ -53,6 +53,27 @@
         extendStatics(d, b);
         function __() { this.constructor = d; }
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    }
+
+    var __assign = function() {
+        __assign = Object.assign || function __assign(t) {
+            for (var s, i = 1, n = arguments.length; i < n; i++) {
+                s = arguments[i];
+                for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+            }
+            return t;
+        };
+        return __assign.apply(this, arguments);
+    };
+
+    function __spreadArray(to, from, pack) {
+        if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+            if (ar || !(i in from)) {
+                if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+                ar[i] = from[i];
+            }
+        }
+        return to.concat(ar || from);
     }
 
     var Browser = (function () {
@@ -808,6 +829,37 @@
         EPSILON: EPSILON
     });
 
+    /*! *****************************************************************************
+    Copyright (c) Microsoft Corporation.
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+    REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+    AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+    INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+    LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+    OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+    PERFORMANCE OF THIS SOFTWARE.
+    ***************************************************************************** */
+    /* global Reflect, Promise */
+
+    var extendStatics$1 = function(d, b) {
+        extendStatics$1 = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics$1(d, b);
+    };
+
+    function __extends$1(d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics$1(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    }
+
     function create(x, y) {
         if (x == null) {
             x = 0;
@@ -1320,6 +1372,10 @@
             srcCoords.push(x, y);
             oldCoordTheSame = oldCoordTheSame && oldSrcCoords && x === oldSrcCoords[ii] && y === oldSrcCoords[ii + 1];
             destCoords.push(markers[i].offsetLeft, markers[i].offsetTop);
+        }
+        if (!oldCoordTheSame) {
+            delete saved.invTrans;
+            delete saved.trans;
         }
         return (oldCoordTheSame && transformer)
             ? transformer
@@ -2117,7 +2173,7 @@
         stop(this.event);
     }
     var EmptyProxy = (function (_super) {
-        __extends(EmptyProxy, _super);
+        __extends$1(EmptyProxy, _super);
         function EmptyProxy() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.handler = null;
@@ -2140,7 +2196,7 @@
     ];
     var tmpRect = new BoundingRect(0, 0, 0, 0);
     var Handler = (function (_super) {
-        __extends(Handler, _super);
+        __extends$1(Handler, _super);
         function Handler(storage, painter, proxy, painterRoot, pointerSize) {
             var _this = _super.call(this) || this;
             _this._hovered = new HoveredResult(0, 0);
@@ -5122,7 +5178,7 @@
         return new Date().getTime();
     }
     var Animation = (function (_super) {
-        __extends(Animation, _super);
+        __extends$1(Animation, _super);
         function Animation(opts) {
             var _this = _super.call(this) || this;
             _this._running = false;
@@ -5513,7 +5569,7 @@
         return DOMHandlerScope;
     }());
     var HandlerDomProxy = (function (_super) {
-        __extends(HandlerDomProxy, _super);
+        __extends$1(HandlerDomProxy, _super);
         function HandlerDomProxy(dom, painterRoot) {
             var _this = _super.call(this) || this;
             _this.__pointerCapturing = false;
@@ -7073,7 +7129,7 @@
     }
 
     var Group = (function (_super) {
-        __extends(Group, _super);
+        __extends$1(Group, _super);
         function Group(opts) {
             var _this = _super.call(this) || this;
             _this.isGroup = true;
@@ -9719,7 +9775,7 @@
     var PRIMARY_STATES_KEYS$1 = ['z', 'z2', 'invisible'];
     var PRIMARY_STATES_KEYS_IN_HOVER_LAYER = ['invisible'];
     var Displayable = (function (_super) {
-        __extends(Displayable, _super);
+        __extends$1(Displayable, _super);
         function Displayable(props) {
             return _super.call(this, props) || this;
         }
@@ -11270,7 +11326,7 @@
         'culling', 'z', 'z2', 'zlevel', 'parent'
     ]);
     var Path = (function (_super) {
-        __extends(Path, _super);
+        __extends$1(Path, _super);
         function Path(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11597,7 +11653,7 @@
         };
         Path.extend = function (defaultProps) {
             var Sub = (function (_super) {
-                __extends(Sub, _super);
+                __extends$1(Sub, _super);
                 function Sub(opts) {
                     var _this = _super.call(this, opts) || this;
                     defaultProps.init && defaultProps.init.call(_this, opts);
@@ -11640,7 +11696,7 @@
         miterLimit: 2
     }, DEFAULT_PATH_STYLE);
     var TSpan = (function (_super) {
-        __extends(TSpan, _super);
+        __extends$1(TSpan, _super);
         function TSpan() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11694,7 +11750,7 @@
             && source.width && source.height);
     }
     var ZRImage = (function (_super) {
-        __extends(ZRImage, _super);
+        __extends$1(ZRImage, _super);
         function ZRImage() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11885,7 +11941,7 @@
     }());
     var subPixelOptimizeOutputShape = {};
     var Rect = (function (_super) {
-        __extends(Rect, _super);
+        __extends$1(Rect, _super);
         function Rect(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11954,7 +12010,7 @@
         }, DEFAULT_COMMON_ANIMATION_PROPS.style)
     };
     var ZRText = (function (_super) {
-        __extends(ZRText, _super);
+        __extends$1(ZRText, _super);
         function ZRText(opts) {
             var _this = _super.call(this) || this;
             _this.type = 'text';
@@ -13473,7 +13529,7 @@
         return path;
     }
     var SVGPath = (function (_super) {
-        __extends(SVGPath, _super);
+        __extends$1(SVGPath, _super);
         function SVGPath() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -13514,7 +13570,7 @@
     function extendFromString(str, defaultOpts) {
         var innerOpts = createPathOptions(str, defaultOpts);
         var Sub = (function (_super) {
-            __extends(Sub, _super);
+            __extends$1(Sub, _super);
             function Sub(opts) {
                 var _this = _super.call(this, opts) || this;
                 _this.applyTransform = innerOpts.applyTransform;
@@ -13555,7 +13611,7 @@
         return CircleShape;
     }());
     var Circle = (function (_super) {
-        __extends(Circle, _super);
+        __extends$1(Circle, _super);
         function Circle(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13580,7 +13636,7 @@
         return EllipseShape;
     }());
     var Ellipse = (function (_super) {
-        __extends(Ellipse, _super);
+        __extends$1(Ellipse, _super);
         function Ellipse(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13847,7 +13903,7 @@
         return SectorShape;
     }());
     var Sector = (function (_super) {
-        __extends(Sector, _super);
+        __extends$1(Sector, _super);
         function Sector(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13875,7 +13931,7 @@
         return RingShape;
     }());
     var Ring = (function (_super) {
-        __extends(Ring, _super);
+        __extends$1(Ring, _super);
         function Ring(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13992,7 +14048,7 @@
         return PolygonShape;
     }());
     var Polygon = (function (_super) {
-        __extends(Polygon, _super);
+        __extends$1(Polygon, _super);
         function Polygon(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14016,7 +14072,7 @@
         return PolylineShape;
     }());
     var Polyline = (function (_super) {
-        __extends(Polyline, _super);
+        __extends$1(Polyline, _super);
         function Polyline(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14048,7 +14104,7 @@
         return LineShape;
     }());
     var Line = (function (_super) {
-        __extends(Line, _super);
+        __extends$1(Line, _super);
         function Line(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14131,7 +14187,7 @@
         }
     }
     var BezierCurve = (function (_super) {
-        __extends(BezierCurve, _super);
+        __extends$1(BezierCurve, _super);
         function BezierCurve(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14206,7 +14262,7 @@
         return ArcShape;
     }());
     var Arc = (function (_super) {
-        __extends(Arc, _super);
+        __extends$1(Arc, _super);
         function Arc(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14236,7 +14292,7 @@
     Arc.prototype.type = 'arc';
 
     var CompoundPath = (function (_super) {
-        __extends(CompoundPath, _super);
+        __extends$1(CompoundPath, _super);
         function CompoundPath() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.type = 'compound';
@@ -14296,7 +14352,7 @@
     }());
 
     var LinearGradient = (function (_super) {
-        __extends(LinearGradient, _super);
+        __extends$1(LinearGradient, _super);
         function LinearGradient(x, y, x2, y2, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0 : x;
@@ -14311,7 +14367,7 @@
     }(Gradient));
 
     var RadialGradient = (function (_super) {
-        __extends(RadialGradient, _super);
+        __extends$1(RadialGradient, _super);
         function RadialGradient(x, y, r, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0.5 : x;
@@ -14460,7 +14516,7 @@
 
     var m = [];
     var IncrementalDisplayable = (function (_super) {
-        __extends(IncrementalDisplayable, _super);
+        __extends$1(IncrementalDisplayable, _super);
         function IncrementalDisplayable() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.notClear = true;
@@ -17174,6 +17230,1646 @@
       }
     }
 
+    var tokens = {
+      color: {},
+      darkColor: {},
+      size: {}
+    };
+    var color$1 = tokens.color = {
+      theme: ['#5070dd', '#b6d634', '#505372', '#ff994d', '#0ca8df', '#ffd10a', '#fb628b', '#785db0', '#3fbe95'],
+      neutral00: '#fff',
+      neutral05: '#f4f7fd',
+      neutral10: '#e8ebf0',
+      neutral15: '#dbdee4',
+      neutral20: '#cfd2d7',
+      neutral25: '#c3c5cb',
+      neutral30: '#b7b9be',
+      neutral35: '#aaacb2',
+      neutral40: '#9ea0a5',
+      neutral45: '#929399',
+      neutral50: '#86878c',
+      neutral55: '#797b7f',
+      neutral60: '#6d6e73',
+      neutral65: '#616266',
+      neutral70: '#54555a',
+      neutral75: '#48494d',
+      neutral80: '#3c3c41',
+      neutral85: '#303034',
+      neutral90: '#232328',
+      neutral95: '#17171b',
+      neutral99: '#000',
+      accent05: '#eff1f9',
+      accent10: '#e0e4f2',
+      accent15: '#d0d6ec',
+      accent20: '#c0c9e6',
+      accent25: '#b1bbdf',
+      accent30: '#a1aed9',
+      accent35: '#91a0d3',
+      accent40: '#8292cc',
+      accent45: '#7285c6',
+      accent50: '#6578ba',
+      accent55: '#5c6da9',
+      accent60: '#536298',
+      accent65: '#4a5787',
+      accent70: '#404c76',
+      accent75: '#374165',
+      accent80: '#2e3654',
+      accent85: '#252b43',
+      accent90: '#1b2032',
+      accent95: '#121521',
+      transparent: 'rgba(0,0,0,0)',
+      highlight: 'rgba(255,231,130,0.8)'
+    };
+    extend(color$1, {
+      primary: color$1.neutral80,
+      secondary: color$1.neutral70,
+      tertiary: color$1.neutral60,
+      quaternary: color$1.neutral50,
+      disabled: color$1.neutral20,
+      border: color$1.neutral30,
+      borderTint: color$1.neutral20,
+      borderShade: color$1.neutral40,
+      background: color$1.neutral05,
+      backgroundTint: 'rgba(234,237,245,0.5)',
+      backgroundTransparent: 'rgba(255,255,255,0)',
+      backgroundShade: color$1.neutral10,
+      shadow: 'rgba(0,0,0,0.2)',
+      shadowTint: 'rgba(129,130,136,0.2)',
+      axisLine: color$1.neutral70,
+      axisLineTint: color$1.neutral40,
+      axisTick: color$1.neutral70,
+      axisTickMinor: color$1.neutral60,
+      axisLabel: color$1.neutral70,
+      axisSplitLine: color$1.neutral15,
+      axisMinorSplitLine: color$1.neutral05
+    });
+    for (var key in color$1) {
+      if (color$1.hasOwnProperty(key)) {
+        var hex = color$1[key];
+        if (key === 'theme') {
+          // Don't modify theme colors.
+          tokens.darkColor.theme = color$1.theme.slice();
+        } else if (key === 'highlight') {
+          tokens.darkColor.highlight = 'rgba(255,231,130,0.4)';
+        } else if (key.indexOf('accent') === 0) {
+          // Desaturate and lighten accent colors.
+          tokens.darkColor[key] = modifyHSL(hex, null, function (s) {
+            return s * 0.5;
+          }, function (l) {
+            return Math.min(1, 1.3 - l);
+          });
+        } else {
+          tokens.darkColor[key] = modifyHSL(hex, null, function (s) {
+            return s * 0.9;
+          }, function (l) {
+            return 1 - Math.pow(l, 1.5);
+          });
+        }
+      }
+    }
+    tokens.size = {
+      xxs: 2,
+      xs: 5,
+      s: 10,
+      m: 15,
+      l: 20,
+      xl: 30,
+      xxl: 40,
+      xxxl: 50
+    };
+
+    var each$1 = each;
+    /**
+     * 全局自动布局管理器：负责收集团队、在合适时机触发布局。
+     *
+     * 使用方式：
+     * - 有坐标系：在 CoordinateSystemManager.update 中调用 collectAndPrepare，并使用 prepareCoordSysContext
+     *   为目标坐标系设置 autoLayoutContext，由各坐标系在其 update 流程中完成布局。
+     * - 无坐标系：在 scheduler.performVisualTasks 之后、render 之前，调用 executeSeriesLayout 来执行系列级布局。
+     */
+    var AutoLayoutManager = /** @class */function () {
+      function AutoLayoutManager() {
+        this._groups = null;
+        this._hasCoordSys = false;
+      }
+      /**
+       * 收集自动布局组件并准备执行阶段信息。
+       */
+      AutoLayoutManager.prototype.collectAndPrepare = function (ecModel, api, hasCoordSys) {
+        try {
+          this._hasCoordSys = !!hasCoordSys;
+          this._groups = collectAutoLayoutGroups(ecModel, api) || null;
+          return this._groups != null && Object.keys(this._groups).length > 0;
+        } catch (e) {
+          // 收集失败则清空，避免后续误用
+          this._groups = null;
+          return false;
+        }
+      };
+      /**
+       * 读取收集到的分组。
+       */
+      AutoLayoutManager.prototype.getGroups = function () {
+        return this._groups;
+      };
+      /**
+       * 有坐标系情况下，为某一位置准备上下文（供坐标系 update 使用）。
+       */
+      AutoLayoutManager.prototype.prepareCoordSysContext = function (position, coordSysList) {
+        if (!this._groups) {
+          return null;
+        }
+        var group = this._groups[position];
+        if (!group) {
+          return null;
+        }
+        return {
+          group: group,
+          needLayout: true
+        };
+      };
+      /**
+       * 无坐标系时在视觉任务之后执行系列布局。
+       */
+      AutoLayoutManager.prototype.executeSeriesLayout = function (ecModel, api) {
+        if (!this._groups || this._hasCoordSys) {
+          return;
+        }
+        handleSeriesAutoLayout(this._groups, ecModel, api);
+      };
+      /**
+       * 重置内部状态。
+       */
+      AutoLayoutManager.prototype.reset = function () {
+        this._groups = null;
+        this._hasCoordSys = false;
+      };
+      return AutoLayoutManager;
+    }();
+    /**
+     * 根据位置找到对应的自动布局坐标系统。
+     *
+     * @param position 图例位置 ('top', 'bottom', 'left', 'right')
+     * @param coordinateSystems 所有可用的自动布局坐标系统。
+     * @returns 对应的自动布局坐标系统，如果没有找到则返回 null。
+     */
+    function findAutoLayoutCoordForPosition(position, coordinateSystems) {
+      if (!coordinateSystems || coordinateSystems.length === 0) {
+        return null;
+      }
+      switch (position) {
+        case 'bottom':
+          {
+            // 找到 y + height 最大的自动布局坐标系统（最下面的）
+            return coordinateSystems.reduce(function (bottomGrid, current) {
+              var currentRect = current.getRect();
+              var bottomRect = bottomGrid ? bottomGrid.getRect() : currentRect;
+              return currentRect.y + currentRect.height > bottomRect.y + bottomRect.height ? current : bottomGrid;
+            });
+          }
+        case 'top':
+          {
+            // 找到 y 最小的自动布局坐标系统（最上面的）
+            return coordinateSystems.reduce(function (topGrid, current) {
+              var currentRect = current.getRect();
+              var topRect = topGrid ? topGrid.getRect() : currentRect;
+              return currentRect.y < topRect.y ? current : topGrid;
+            });
+          }
+        case 'left':
+          {
+            // 找到 x 最小的自动布局坐标系统（最左边的）
+            return coordinateSystems.reduce(function (leftGrid, current) {
+              var currentRect = current.getRect();
+              var leftRect = leftGrid ? leftGrid.getRect() : currentRect;
+              return currentRect.x < leftRect.x ? current : leftGrid;
+            });
+          }
+        case 'right':
+          {
+            // 找到 x + width 最大的自动布局坐标系统（最右边的）
+            return coordinateSystems.reduce(function (rightGrid, current) {
+              var currentRect = current.getRect();
+              var rightRect = rightGrid ? rightGrid.getRect() : currentRect;
+              return currentRect.x + currentRect.width > rightRect.x + rightRect.width ? current : rightGrid;
+            });
+          }
+        default:
+          {
+            return coordinateSystems[0]; // 默认使用第一个自动布局坐标系统
+          }
+      }
+    }
+    /**
+     * 根据位置找到对应的自动布局系列。
+     *
+     * @param position 图例位置 ('top', 'bottom', 'left', 'right')
+     * @param seriesList 所有系列列表。
+     * @param api 扩展API。
+     * @returns 对应的自动布局系列，如果没有找到则返回 null。
+     */
+    function findAutoLayoutSeriesForPosition(position, seriesList, api) {
+      if (!seriesList || seriesList.length === 0) {
+        return null;
+      }
+      var bestSeries = null;
+      // 一次遍历找到最合适的系列
+      seriesList.forEach(function (series) {
+        var _a;
+        var seriesView = api.getViewOfSeriesModel(series);
+        var rect = (_a = seriesView === null || seriesView === void 0 ? void 0 : seriesView.getOuterBoundingRect) === null || _a === void 0 ? void 0 : _a.call(seriesView, series, series.ecModel, api, null);
+        if (!rect || rect.width <= 0 || rect.height <= 0) {
+          return;
+        }
+        // 如果这是第一个有效系列，直接选中
+        if (bestSeries == null) {
+          bestSeries = series;
+          return;
+        }
+        var bestSeriesView = api.getViewOfSeriesModel(bestSeries);
+        var bestRect = bestSeriesView.getOuterBoundingRect(bestSeries, bestSeries.ecModel, api, null);
+        switch (position) {
+          case 'bottom':
+            {
+              // 找到 y + height 最大的系列（最下面的）
+              if (rect.y + rect.height > bestRect.y + bestRect.height) {
+                bestSeries = series;
+              }
+              break;
+            }
+          case 'top':
+            {
+              // 找到 y 最小的系列（最上面的）
+              if (rect.y < bestRect.y) {
+                bestSeries = series;
+              }
+              break;
+            }
+          case 'left':
+            {
+              // 找到 x 最小的系列（最左边的）
+              if (rect.x < bestRect.x) {
+                bestSeries = series;
+              }
+              break;
+            }
+          case 'right':
+            {
+              // 找到 x + width 最大的系列（最右边的）
+              if (rect.x + rect.width > bestRect.x + bestRect.width) {
+                bestSeries = series;
+              }
+              break;
+            }
+        }
+      });
+      return bestSeries;
+    }
+    /**
+     * 处理自动布局时的智能选项。
+     *
+     * @param option 自动布局配置选项。
+     */
+    function preprocessAutoLayoutOption(option) {
+      var autoLayout = option.autoLayout;
+      if (!autoLayout || !autoLayout.enable) {
+        return;
+      }
+      var position = autoLayout.position;
+      // 根据自动布局位置设置布局方向
+      if (position === 'top' || position === 'bottom') {
+        option.orient = 'horizontal';
+      } else {
+        option.orient = 'vertical';
+      }
+    }
+    /**
+     * 收集所有启用 autoLayout 的组件并生成分组。
+     *
+     * @param ecModel 全局模型。
+     * @param api 扩展API。
+     * @returns 组件分组信息，如果没有收集到任何组件，则返回空对象。
+     */
+    function collectAutoLayoutGroups(ecModel, api) {
+      var groups;
+      // 收集所有启用 autoLayout 的组件
+      var legends = ecModel.findComponents({
+        mainType: 'legend'
+      });
+      var vms = ecModel.findComponents({
+        mainType: 'visualMap'
+      });
+      var collectComponents = function (components) {
+        components.forEach(function (model) {
+          var autoLayout = model === null || model === void 0 ? void 0 : model.get('autoLayout');
+          if ((autoLayout === null || autoLayout === void 0 ? void 0 : autoLayout.enable) !== true) {
+            return;
+          }
+          if (!groups) {
+            groups = {};
+          }
+          var position = autoLayout.position;
+          var align = autoLayout.align || 'center';
+          var layoutMode = autoLayout.layoutMode || 'multiLine';
+          var isScroll = model.subType === 'scroll';
+          // 获取估算尺寸
+          var estimatedSize = estimateLegendSize(model, api, ecModel);
+          // 创建或获取分组
+          var groupId = position;
+          var group = groups[groupId];
+          if (!group) {
+            group = groups[groupId] = createLayoutGroup(groupId, position, align, layoutMode);
+          }
+          // 添加组件到分组
+          group.items.push({
+            model: model,
+            scroll: !!isScroll,
+            estimatedSize: estimatedSize
+          });
+        });
+      };
+      collectComponents(legends);
+      collectComponents(vms);
+      return groups;
+    }
+    /**
+     * 计算单个图例分组需要的空间并累积到margin用于挤压grid空间。
+     *
+     * @param group 图例分组。
+     * @param api 扩展API。
+     * @param gridRect 网格矩形。
+     * @param margin 用于挤压grid空间的margin。
+     * @returns 是否需要空间。
+     */
+    function fillLegendGroupSpaceToMargin(group, api, gridRect, margin, context) {
+      var _a;
+      try {
+        // 计算分组需要的空间
+        var spaceRequirement = calculateGroupSpaceRequirement(group, api, gridRect, margin);
+        // 如果需要的空间超过可用空间，累积到 margin
+        if (spaceRequirement.neededSpace > spaceRequirement.availableSpace) {
+          var extraSpace = spaceRequirement.neededSpace - spaceRequirement.availableSpace;
+          var positionToMarginIndex = {
+            top: 0,
+            bottom: 2,
+            left: 3,
+            right: 1
+          };
+          var margin_1 = (_a = context.margin) !== null && _a !== void 0 ? _a : context.margin = [0, 0, 0, 0];
+          margin_1[positionToMarginIndex[group.position]] += extraSpace;
+          return true; // 需要空间
+        }
+        return false; // 不需要空间
+      } catch (error) {
+        console.error('Fill legend group space to margin failed', error);
+        return false;
+      }
+    }
+    /**
+     * 计算分组的空间需求。
+     *
+     * @param group 分组对象。
+     * @param api 扩展API。
+     * @param gridRect 网格矩形。
+     * @param margin 用于挤压grid空间的margin。
+     * @returns 空间需求信息。
+     */
+    function calculateGroupSpaceRequirement(group, api, gridRect, margin) {
+      var position = group.position,
+        items = group.items;
+      var positionToMarginIndex = {
+        top: 0,
+        bottom: 2,
+        left: 3,
+        right: 1
+      };
+      var hasMarginValue = (margin === null || margin === void 0 ? void 0 : margin[positionToMarginIndex[position]]) > 0;
+      // 计算该方向的可用空间
+      var availableSpace;
+      // 如果对应方向的margin已经有值，说明已经空间不足，availableSpace为0，但仍需计算neededSpace
+      if (hasMarginValue) {
+        availableSpace = 0;
+      } else {
+        if (position === 'top') {
+          availableSpace = gridRect.y;
+        } else if (position === 'bottom') {
+          availableSpace = api.getHeight() - (gridRect.y + gridRect.height);
+        } else if (position === 'left') {
+          availableSpace = gridRect.x;
+        } else {
+          // position === 'right'
+          availableSpace = api.getWidth() - (gridRect.x + gridRect.width);
+        }
+      }
+      if (items.length === 0) {
+        return {
+          neededSpace: 0,
+          availableSpace: availableSpace
+        };
+      }
+      if (items.length === 1) {
+        // 单个组件，直接使用其估算大小
+        var size = items[0].estimatedSize;
+        if (!size) {
+          return {
+            neededSpace: 0,
+            availableSpace: availableSpace
+          };
+        }
+        var mainSize = position === 'top' || position === 'bottom' ? size.height : size.width;
+        return {
+          neededSpace: mainSize + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+          availableSpace: availableSpace
+        };
+      }
+      // 多个组件，需要考虑排列方式
+      return calculateMultiComponentSpace(group, availableSpace);
+    }
+    /**
+     * 计算多个组件的空间需求。
+     *
+     * @param group 分组对象。
+     * @param availableSpace 可用空间。
+     * @returns 空间需求信息。
+     */
+    function calculateMultiComponentSpace(group, availableSpace) {
+      var position = group.position,
+        items = group.items,
+        layoutMode = group.layoutMode;
+      var isHorizontal = position === 'top' || position === 'bottom';
+      if (items.length === 1) {
+        // 单个组件，直接使用其估算大小
+        var size = items[0].estimatedSize;
+        if (!size || size.width <= 0 || size.height <= 0) {
+          return {
+            neededSpace: 0,
+            availableSpace: availableSpace
+          };
+        }
+        var mainSize = isHorizontal ? size.height : size.width;
+        return {
+          neededSpace: mainSize + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+          availableSpace: availableSpace
+        };
+      }
+      if (layoutMode === 'singleLine') {
+        // 单行布局：所有组件在一行/列
+        if (isHorizontal) {
+          // 水平位置：单行布局
+          var heights = items.map(function (item) {
+            var size = item.estimatedSize;
+            return size && size.height > 0 ? size.height : 0;
+          });
+          return {
+            neededSpace: Math.max.apply(Math, heights) + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+            availableSpace: availableSpace
+          };
+        } else {
+          // 垂直位置：单列布局
+          var widths = items.map(function (item) {
+            var size = item.estimatedSize;
+            return size && size.width > 0 ? size.width : 0;
+          });
+          return {
+            neededSpace: Math.max.apply(Math, widths) + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+            availableSpace: availableSpace
+          };
+        }
+      } else {
+        // 多行布局：每个组件单独一行/列
+        if (isHorizontal) {
+          // 水平位置：每个组件单独一行
+          var totalHeight = items.reduce(function (sum, item) {
+            var size = item.estimatedSize;
+            var height = size && size.height > 0 ? size.height : 0;
+            return sum + height;
+          }, 0) + DEFAULT_LAYOUT_CONFIG.itemGap * (items.length - 1);
+          return {
+            neededSpace: totalHeight + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+            availableSpace: availableSpace
+          };
+        } else {
+          // 垂直位置：每个组件单独一列
+          var totalWidth = items.reduce(function (sum, item) {
+            var size = item.estimatedSize;
+            var width = size && size.width > 0 ? size.width : 0;
+            return sum + width;
+          }, 0) + DEFAULT_LAYOUT_CONFIG.itemGap * (items.length - 1);
+          return {
+            neededSpace: totalWidth + DEFAULT_LAYOUT_CONFIG.marginToGrid,
+            availableSpace: availableSpace
+          };
+        }
+      }
+    }
+    /**
+     * 对分组组件进行自动布局。
+     *
+     * @param group 分组对象。
+     * @param api 扩展API。
+     * @param container 容器尺寸。
+     * @param gridRect 网格矩形。
+     */
+    function layoutGroup(group, container, gridRect) {
+      try {
+        var items = group.items;
+        if (items.length === 0) {
+          return;
+        }
+        if (items.length === 1) {
+          // 单个组件：直接布局
+          layoutSingleItem(group, container, gridRect);
+        } else {
+          if (group.layoutMode === 'singleLine') {
+            // 单行布局：所有组件在一行/列
+            if (group.orient === 'horizontal') {
+              layoutHorizontalSingleRow(group, container, gridRect);
+            } else {
+              layoutVerticalSingleColumn(group, container, gridRect);
+            }
+          } else {
+            // 多行布局：每个组件单独一行/列
+            if (group.orient === 'horizontal') {
+              layoutHorizontalRows(group, container, gridRect);
+            } else {
+              layoutVerticalColumns(group, container, gridRect);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Auto layout failed for group " + group.id, error);
+        // 回退到默认布局：将组件放在左上角
+        group.items.forEach(function (item) {
+          try {
+            item.model.setAutoLayoutBoxParams({
+              left: 0,
+              top: 0,
+              width: item.estimatedSize.width,
+              height: item.estimatedSize.height
+            });
+          } catch (modelError) {
+            console.error('Failed to set layout for component', modelError);
+          }
+        });
+      }
+    }
+    /**
+     * 单个组件布局。
+     *
+     * @param group 分组对象。
+     * @param container 容器尺寸。
+     * @param gridRect 网格矩形。
+     */
+    function layoutSingleItem(group, container, gridRect) {
+      try {
+        var position = group.position,
+          items = group.items,
+          align = group.align;
+        var item = items[0];
+        var itemSize = item.estimatedSize || {
+          width: 0,
+          height: 0
+        };
+        var newBox = void 0;
+        switch (position) {
+          case 'top':
+            {
+              newBox = __assign({
+                bottom: container.height - gridRect.y + DEFAULT_LAYOUT_CONFIG.marginToGrid
+              }, calculateHorizontalAlign(align, container.width, itemSize.width));
+              break;
+            }
+          case 'bottom':
+            {
+              newBox = __assign({
+                top: gridRect.y + gridRect.height + DEFAULT_LAYOUT_CONFIG.marginToGrid
+              }, calculateHorizontalAlign(align, container.width, itemSize.width));
+              break;
+            }
+          case 'left':
+            {
+              newBox = __assign({
+                right: container.width - gridRect.x + DEFAULT_LAYOUT_CONFIG.marginToGrid
+              }, calculateVerticalAlign(align, container.height, itemSize.height));
+              break;
+            }
+          case 'right':
+            {
+              newBox = __assign({
+                left: gridRect.x + gridRect.width + DEFAULT_LAYOUT_CONFIG.marginToGrid
+              }, calculateVerticalAlign(align, container.height, itemSize.height));
+              break;
+            }
+          default:
+            {
+              break;
+            }
+        }
+        item.model.setAutoLayoutBoxParams(newBox);
+      } catch (error) {
+        console.error("Layout single item failed for group " + group.id, error);
+        // 回退到默认布局
+        var item = group.items[0];
+        item.model.setAutoLayoutBoxParams(undefined);
+      }
+    }
+    /**
+     * 水平位置多行布局（每个组件一行）。
+     *
+     * @param group 分组对象。
+     * @param container 容器尺寸。
+     * @param gridRect 网格矩形。
+     */
+    function layoutHorizontalRows(group, container, gridRect) {
+      var position = group.position,
+        items = group.items,
+        align = group.align;
+      var itemGap = DEFAULT_LAYOUT_CONFIG.itemGap;
+      if (position === 'bottom') {
+        // bottom位置：从grid底部开始向下布局
+        var top_1 = gridRect.y + gridRect.height + DEFAULT_LAYOUT_CONFIG.marginToGrid;
+        items.forEach(function (item) {
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          // 计算X对齐偏移
+          var alignProps = calculateHorizontalAlign(align, container.width, itemSize.width);
+          var newBox = __assign(__assign({}, alignProps), {
+            top: top_1
+          });
+          item.model.setAutoLayoutBoxParams(newBox);
+          top_1 += itemSize.height + itemGap;
+        });
+      } else {
+        // top位置：从grid顶部开始向上布局
+        var bottom = container.height - gridRect.y + DEFAULT_LAYOUT_CONFIG.marginToGrid;
+        for (var i = items.length - 1; i >= 0; i--) {
+          var item = items[i];
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          // 计算X对齐偏移
+          var alignProps = calculateHorizontalAlign(align, container.width, itemSize.width);
+          var newBox = __assign(__assign({}, alignProps), {
+            bottom: bottom
+          });
+          item.model.setAutoLayoutBoxParams(newBox);
+          bottom += itemSize.height + itemGap;
+        }
+      }
+    }
+    /**
+     * 从位置推断布局方向。
+     */
+    function inferLayoutFromPosition(position) {
+      if (position === 'top' || position === 'bottom') {
+        return {
+          orient: 'horizontal'
+        };
+      } else {
+        return {
+          orient: 'vertical'
+        };
+      }
+    }
+    /**
+     * 创建默认的布局分组。
+     */
+    function createLayoutGroup(id, position, align, layoutMode) {
+      if (align === void 0) {
+        align = 'center';
+      }
+      if (layoutMode === void 0) {
+        layoutMode = 'multiLine';
+      }
+      var orient = inferLayoutFromPosition(position).orient;
+      return {
+        id: id,
+        position: position,
+        orient: orient,
+        align: align,
+        layoutMode: layoutMode,
+        items: []
+      };
+    }
+    /**
+     * 应用尺寸约束到估算尺寸。
+     *
+     * @param model 组件模型
+     * @param estimatedSize 原始估算尺寸
+     * @returns 应用约束后的尺寸
+     */
+    function applySizeConstraints(model, estimatedSize) {
+      var constrainedSize = __assign({}, estimatedSize);
+      var minSize = model.get('minSize');
+      var maxSize = model.get('maxSize');
+      // 应用最小尺寸约束
+      if (minSize) {
+        if (minSize.width != null) {
+          constrainedSize.width = Math.max(constrainedSize.width, minSize.width);
+        }
+        if (minSize.height != null) {
+          constrainedSize.height = Math.max(constrainedSize.height, minSize.height);
+        }
+      }
+      // 应用最大尺寸约束
+      if (maxSize) {
+        if (maxSize.width != null) {
+          constrainedSize.width = Math.min(constrainedSize.width, maxSize.width);
+        }
+        if (maxSize.height != null) {
+          constrainedSize.height = Math.min(constrainedSize.height, maxSize.height);
+        }
+      }
+      return constrainedSize;
+    }
+    // 计算容器尺寸。
+    function getViewSize(api) {
+      return {
+        width: api.getWidth(),
+        height: api.getHeight()
+      };
+    }
+    /**
+     * 计算水平对齐的BoxLayoutOptionMixin属性。
+     *
+     * @param align 对齐方式：'start' | 'center' | 'end'
+     * @param containerWidth 容器宽度
+     * @param itemWidth 项目宽度
+     * @returns 包含left或right属性的对象
+     */
+    function calculateHorizontalAlign(align, containerWidth, itemWidth) {
+      switch (align) {
+        case 'start':
+          {
+            return {
+              left: 0
+            };
+          }
+        case 'center':
+          {
+            return {
+              left: Math.floor((containerWidth - itemWidth) / 2)
+            };
+          }
+        case 'end':
+          {
+            return {
+              right: 0
+            };
+          }
+        default:
+          {
+            return {
+              left: 0
+            };
+          }
+      }
+    }
+    /**
+     * 计算垂直对齐的BoxLayoutOptionMixin属性。
+     *
+     * @param align 对齐方式：'start' | 'center' | 'end'
+     * @param containerHeight 容器高度
+     * @param itemHeight 项目高度
+     * @returns 包含top或bottom属性的对象
+     */
+    function calculateVerticalAlign(align, containerHeight, itemHeight) {
+      switch (align) {
+        case 'start':
+          {
+            return {
+              top: 0
+            };
+          }
+        case 'center':
+          {
+            return {
+              top: Math.floor((containerHeight - itemHeight) / 2)
+            };
+          }
+        case 'end':
+          {
+            return {
+              bottom: 0
+            };
+          }
+        default:
+          {
+            return {
+              top: 0
+            };
+          }
+      }
+    }
+    /**
+     * 计算组件尺寸压缩。
+     *
+     * 按组件尺寸从大到小排序，依次压缩到最小尺寸，剩余压缩平均分配。
+     *
+     * @param items 组件项数组
+     * @param totalSize 总尺寸
+     * @param containerSize 容器尺寸
+     * @param dimension 压缩维度，'width' 或 'height'
+     * @returns 压缩映射，未压缩则返回undefined
+     */
+    function calculateCompress(items, totalSize, containerSize, dimension) {
+      var _a;
+      if (totalSize <= containerSize) {
+        return undefined; // 不需要压缩
+      }
+      // 增加1px的间距作为安全边际
+      var totalCompressSize = totalSize - containerSize + 1;
+      var compressMap = {};
+      // 按组件尺寸从大到小排序
+      var sortedIndices = items.map(function (item, index) {
+        return index;
+      });
+      sortedIndices.sort(function (a, b) {
+        return items[b].estimatedSize[dimension] - items[a].estimatedSize[dimension];
+      });
+      var remainingCompress = totalCompressSize;
+      // 第一遍：从大到小依次压缩，每个组件最多压缩到最小允许尺寸
+      for (var i = 0; i < sortedIndices.length; i++) {
+        if (remainingCompress <= 0) {
+          break;
+        }
+        var index = sortedIndices[i];
+        var item = items[index];
+        var size = item.estimatedSize[dimension];
+        var minSize = Math.max(((_a = item.model.get('minSize')) === null || _a === void 0 ? void 0 : _a[dimension]) || 0, 4 // 最小显示4px
+        );
+        var maxCompress = Math.max(0, size - minSize);
+        var actualCompress = Math.min(maxCompress, remainingCompress);
+        if (actualCompress > 0) {
+          compressMap[index] = actualCompress;
+        }
+        remainingCompress -= actualCompress;
+      }
+      // 第二遍：如果还有剩余压缩需求，平均分配给所有组件
+      if (remainingCompress > 0) {
+        var compressibleCount = sortedIndices.length;
+        var avgRemainingCompress = remainingCompress / compressibleCount;
+        for (var i = 0; i < sortedIndices.length; i++) {
+          var index = sortedIndices[i];
+          compressMap[index] = (compressMap[index] || 0) + avgRemainingCompress;
+        }
+      }
+      return compressMap;
+    }
+    /**
+     * 水平位置单行布局。
+     *
+     * @param group 分组对象。
+     * @param container 容器尺寸。
+     * @param gridRect 网格矩形。
+     */
+    function layoutHorizontalSingleRow(group, container, gridRect) {
+      var position = group.position,
+        items = group.items,
+        align = group.align;
+      var itemGap = DEFAULT_LAYOUT_CONFIG.itemGap;
+      var gapWidth = (items.length - 1) * itemGap;
+      // 计算总宽度
+      var totalWidth = items.reduce(function (sum, item) {
+        var size = item.estimatedSize;
+        var width = size && size.width > 0 ? size.width : 0;
+        return sum + width;
+      }, 0) + gapWidth;
+      var effectiveTotalWidth = totalWidth;
+      var containerWidth = container.width;
+      // 计算需要压缩的组件宽度
+      var compressMap = calculateCompress(items, totalWidth, containerWidth, 'width');
+      if (compressMap) {
+        effectiveTotalWidth = container.width;
+      }
+      // 计算起始X位置或right值
+      var left;
+      var right;
+      switch (align) {
+        case 'start':
+          {
+            left = 0;
+            break;
+          }
+        case 'center':
+          {
+            left = Math.floor((container.width - effectiveTotalWidth) / 2);
+            break;
+          }
+        case 'end':
+          {
+            // end对齐：从右边开始，使用right属性
+            right = 0;
+            break;
+          }
+        default:
+          {
+            left = 0;
+            break;
+          }
+      }
+      // 计算Y位置
+      var layoutBox = position === 'bottom' ? {
+        top: gridRect.y + gridRect.height + DEFAULT_LAYOUT_CONFIG.marginToGrid
+      } : {
+        bottom: container.height - gridRect.y + DEFAULT_LAYOUT_CONFIG.marginToGrid
+      };
+      // 布局组件
+      if (right != null) {
+        // end对齐：从右往左布局
+        for (var i = items.length - 1; i >= 0; i--) {
+          var itemSize = items[i].estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          var compressWidth = compressMap === null || compressMap === void 0 ? void 0 : compressMap[i];
+          var layoutParams = __assign({
+            right: right
+          }, layoutBox);
+          var itemWidth = itemSize.width;
+          if (compressWidth != null) {
+            itemWidth = layoutParams.width = itemWidth - compressWidth;
+          } else {
+            layoutParams.width = itemWidth;
+          }
+          items[i].model.setAutoLayoutBoxParams(layoutParams);
+          right += itemWidth + itemGap;
+        }
+      } else {
+        // start或center对齐：从左往右布局
+        items.forEach(function (item, index) {
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          var itemWidth = itemSize.width;
+          var compressWidth = compressMap === null || compressMap === void 0 ? void 0 : compressMap[index];
+          var layoutParams = __assign({
+            left: left
+          }, layoutBox);
+          if (compressWidth != null) {
+            itemWidth = layoutParams.width = itemWidth - compressWidth;
+          } else {
+            layoutParams.width = itemWidth;
+          }
+          item.model.setAutoLayoutBoxParams(layoutParams);
+          left += itemWidth + itemGap;
+        });
+      }
+    }
+    /**
+     * 垂直位置单列布局
+     */
+    function layoutVerticalSingleColumn(group, container, gridRect) {
+      var position = group.position,
+        items = group.items,
+        align = group.align;
+      var itemGap = DEFAULT_LAYOUT_CONFIG.itemGap;
+      var gapHeight = (items.length - 1) * itemGap;
+      // 计算总高度
+      var totalHeight = items.reduce(function (sum, item) {
+        var size = item.estimatedSize;
+        var height = size && size.height > 0 ? size.height : 0;
+        return sum + height;
+      }, 0) + gapHeight;
+      var effectiveTotalHeight = totalHeight;
+      var containerHeight = container.height;
+      // 计算需要压缩的组件高度
+      var compressMap = calculateCompress(items, totalHeight, containerHeight, 'height');
+      if (compressMap) {
+        effectiveTotalHeight = container.height;
+      }
+      // 计算起始Y位置或bottom值
+      var top;
+      var bottom;
+      switch (align) {
+        case 'start':
+          {
+            top = 0;
+            break;
+          }
+        case 'center':
+          {
+            top = Math.floor((container.height - effectiveTotalHeight) / 2);
+            break;
+          }
+        case 'end':
+          {
+            // end对齐：从下边开始，使用bottom属性
+            bottom = 0;
+            top = 0; // 从下往上布局时，从底部第一个组件开始
+            break;
+          }
+        default:
+          {
+            top = 0;
+            break;
+          }
+      }
+      // 计算X位置
+      var layoutBox = position === 'right' ? {
+        left: gridRect.x + gridRect.width + DEFAULT_LAYOUT_CONFIG.marginToGrid
+      } : {
+        right: container.width - gridRect.x + DEFAULT_LAYOUT_CONFIG.marginToGrid
+      };
+      // 布局组件
+      if (bottom != null) {
+        // end对齐：从下往上布局
+        for (var i = items.length - 1; i >= 0; i--) {
+          var itemSize = items[i].estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          var compressHeight = compressMap === null || compressMap === void 0 ? void 0 : compressMap[i];
+          var layoutParams = __assign({
+            bottom: bottom
+          }, layoutBox);
+          var itemHeight = itemSize.height;
+          if (compressHeight != null) {
+            itemHeight = layoutParams.height = itemHeight - compressHeight;
+          } else {
+            layoutParams.height = itemHeight;
+          }
+          items[i].model.setAutoLayoutBoxParams(layoutParams);
+          bottom += itemHeight + itemGap;
+        }
+      } else {
+        // start或center对齐：从上往下布局
+        items.forEach(function (item, index) {
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          var itemHeight = itemSize.height;
+          var compressHeight = compressMap === null || compressMap === void 0 ? void 0 : compressMap[index];
+          var layoutParams = __assign({
+            top: top
+          }, layoutBox);
+          if (compressHeight != null) {
+            itemHeight = layoutParams.height = itemHeight - compressHeight;
+          } else {
+            layoutParams.height = itemHeight;
+          }
+          item.model.setAutoLayoutBoxParams(layoutParams);
+          top += itemHeight + itemGap;
+        });
+      }
+    }
+    /**
+     * 垂直位置多列布局（每个组件一列）。
+     *
+     * @param group 分组对象。
+     * @param container 容器尺寸。
+     * @param gridRect 网格矩形。
+     */
+    function layoutVerticalColumns(group, container, gridRect) {
+      var position = group.position,
+        items = group.items,
+        align = group.align;
+      var itemGap = DEFAULT_LAYOUT_CONFIG.itemGap;
+      if (position === 'right') {
+        // right位置：从grid右侧开始向右布局
+        var left_1 = gridRect.x + gridRect.width + DEFAULT_LAYOUT_CONFIG.marginToGrid;
+        items.forEach(function (item) {
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          // 计算Y对齐偏移
+          var alignProps = calculateVerticalAlign(align, container.height, itemSize.height);
+          var newBox = __assign(__assign({}, alignProps), {
+            left: left_1
+          });
+          item.model.setAutoLayoutBoxParams(newBox);
+          left_1 += itemSize.width + itemGap;
+        });
+      } else {
+        // left位置：从grid左侧开始向左布局
+        var right = container.width - gridRect.x + DEFAULT_LAYOUT_CONFIG.marginToGrid;
+        for (var i = items.length - 1; i >= 0; i--) {
+          var item = items[i];
+          var itemSize = item.estimatedSize || {
+            width: 0,
+            height: 0
+          };
+          // 计算Y对齐偏移
+          var alignProps = calculateVerticalAlign(align, container.height, itemSize.height);
+          var newBox = __assign(__assign({}, alignProps), {
+            right: right
+          });
+          item.model.setAutoLayoutBoxParams(newBox);
+          right += itemSize.width + itemGap;
+        }
+      }
+    }
+    // 改进的图例尺寸估算函数（复用现有视图实例）
+    function estimateLegendSize(model, api, ecModel) {
+      try {
+        // 使用现有的视图实例进行估算渲染
+        var view = api.getViewOfComponentModel(model);
+        if (view && typeof view.renderForEstimate === 'function') {
+          // 估算前需要清除之前的自动布局产生的结果，避免影响估算结果
+          model.setAutoLayoutBoxParams(undefined);
+          var bounds = view.renderForEstimate(model, ecModel, api);
+          return applySizeConstraints(model, {
+            width: bounds.width,
+            height: bounds.height
+          });
+        } else {
+          // 如果视图不支持估算，根据组件类型回退到相应的估算方法
+          var containerRect = {
+            x: 0,
+            y: 0,
+            width: api.getWidth(),
+            height: api.getHeight()
+          };
+          var estimatedSize = void 0;
+          if (model.mainType === 'legend') {
+            estimatedSize = estimateLegendSizeFallback(model, containerRect);
+          } else if (model.mainType === 'visualMap') {
+            estimatedSize = estimateVisualMapSizeFallback(model, containerRect);
+          } else {
+            // 未知组件类型，没有尺寸
+            estimatedSize = {
+              width: 0,
+              height: 0
+            };
+          }
+          return applySizeConstraints(model, estimatedSize);
+        }
+      } catch (error) {
+        var containerRect = {
+          x: 0,
+          y: 0,
+          width: api.getWidth(),
+          height: api.getHeight()
+        };
+        // 如果估算失败，根据组件类型回退到相应的估算方法
+        console.warn('Component view estimation failed, falling back to estimation', error);
+        var estimatedSize = void 0;
+        if (model.mainType === 'legend') {
+          // 图例组件类型，使用图例估算方法
+          estimatedSize = estimateLegendSizeFallback(model, containerRect);
+        } else if (model.mainType === 'visualMap') {
+          // 视觉映射组件类型，使用视觉映射估算方法
+          estimatedSize = estimateVisualMapSizeFallback(model, containerRect);
+        } else {
+          estimatedSize = {
+            // 未知组件类型，没有尺寸
+            width: 0,
+            height: 0
+          };
+        }
+        return applySizeConstraints(model, estimatedSize);
+      }
+    }
+    // 视觉映射组件尺寸估算回退方法
+    function estimateVisualMapSizeFallback(model, container) {
+      var orient = model.get('orient');
+      var itemWidth = model.get('itemWidth');
+      var itemHeight = model.get('itemHeight');
+      var textGap = model.get('textGap') || 10;
+      // 获取文本样式模型
+      var textStyleModel = model.getModel('textStyle');
+      // 估算文本尺寸
+      function estimateTextSize(text) {
+        var tempText = new ZRText();
+        var style = createTextStyle(textStyleModel, {
+          text: text,
+          fill: 'transparent' // 不渲染，仅用于尺寸计算
+        });
+        tempText.useStyle(style);
+        tempText.update();
+        var rect = tempText.getBoundingRect();
+        return {
+          width: rect.width,
+          height: rect.height
+        };
+      }
+      // 获取最小和最大值文本
+      var minValue = model.get('min');
+      var maxValue = model.get('max');
+      var minText = minValue != null ? String(minValue) : '';
+      var maxText = maxValue != null ? String(maxValue) : '';
+      var minTextSize = estimateTextSize(minText);
+      var maxTextSize = estimateTextSize(maxText);
+      var maxTextWidth = Math.max(minTextSize.width, maxTextSize.width);
+      var textHeight = Math.max(minTextSize.height, maxTextSize.height);
+      if (orient === 'horizontal') {
+        // 水平视觉映射：宽度为主，高度为次
+        var defaultWidth = Math.max(container.width * 0.6, 200); // 默认宽度
+        var defaultHeight = 40; // 默认高度
+        var contentWidth = itemWidth || defaultWidth;
+        var contentHeight = itemHeight || defaultHeight;
+        // 总宽度 = 内容宽度 + 文本间距 + 文本宽度
+        var totalWidth = contentWidth + textGap + maxTextWidth;
+        var totalHeight = Math.max(contentHeight, textHeight);
+        return {
+          width: Math.min(totalWidth, container.width),
+          height: totalHeight
+        };
+      } else {
+        // 垂直视觉映射：高度为主，宽度为次
+        var defaultHeight = Math.max(container.height * 0.4, 150); // 默认高度
+        var defaultWidth = 60; // 默认宽度
+        var contentHeight = itemHeight || defaultHeight;
+        var contentWidth = itemWidth || defaultWidth;
+        // 总高度 = 内容高度 + 文本间距 + 文本高度
+        var totalHeight = contentHeight + textGap + textHeight;
+        var totalWidth = Math.max(contentWidth, maxTextWidth);
+        return {
+          width: totalWidth,
+          height: Math.min(totalHeight, container.height)
+        };
+      }
+    }
+    /**
+     * 图例组件尺寸估算回退方法。
+     *
+     * @param model 图例模型。
+     * @param container 容器尺寸。
+     * @returns 估算的尺寸。
+     */
+    function estimateLegendSizeFallback(model, container) {
+      var orient = model.get('orient');
+      var data = model.get('data') || [];
+      var itemHeight = model.get('itemHeight') || 14;
+      var itemGap = model.get('itemGap') || 10;
+      var selector = model.get('selector');
+      var selectorItemGap = model.get('selectorItemGap') || 10;
+      var selectorButtonGap = model.get('selectorButtonGap') || 10;
+      // 获取文本样式模型（用于准确的文本尺寸估算）
+      var textStyleModel = model.getModel('textStyle');
+      var formatter = model.get('formatter');
+      // 创建临时文本元素来准确估算文本尺寸
+      function estimateTextSize(text) {
+        // 使用图形工具创建临时文本元素
+        var tempText = new ZRText();
+        var style = createTextStyle(textStyleModel, {
+          text: text,
+          fill: 'transparent' // 不渲染，仅用于尺寸计算
+        });
+        tempText.useStyle(style);
+        tempText.update();
+        var rect = tempText.getBoundingRect();
+        return {
+          width: rect.width,
+          height: rect.height
+        };
+      }
+      // 获取格式化后的文本
+      function getFormattedText(item) {
+        var content = item.name || item.text || item.toString();
+        if (isString(formatter) && formatter) {
+          content = formatter.replace('{name}', content);
+        } else if (isFunction(formatter)) {
+          content = formatter(content);
+        }
+        return content;
+      }
+      // 估算内容区域尺寸
+      var contentWidth = 0;
+      var contentHeight = 0;
+      if (data.length > 0) {
+        // 估算每行/列的最大宽度和高度
+        var maxItemWidth_1 = 0;
+        var maxItemHeight_1 = 0;
+        data.forEach(function (item) {
+          var text = getFormattedText(item);
+          var textSize = estimateTextSize(text);
+          // 图例项宽度 = 图标宽度 + 文本宽度 + 间距
+          var itemWidth = model.get('itemWidth') || 25;
+          var itemTotalWidth = itemWidth + textSize.width + 5; // 5px 间距
+          var itemTotalHeight = Math.max(itemHeight, textSize.height);
+          maxItemWidth_1 = Math.max(maxItemWidth_1, itemTotalWidth);
+          maxItemHeight_1 = Math.max(maxItemHeight_1, itemTotalHeight);
+        });
+        if (orient === 'horizontal') {
+          // 水平布局：估算行数和总宽度
+          var itemsPerRow = Math.floor(container.width / (maxItemWidth_1 + itemGap));
+          var rowCount = Math.ceil(data.length / Math.max(1, itemsPerRow));
+          contentWidth = Math.min(data.length * (maxItemWidth_1 + itemGap) - itemGap,
+          // 单行最大宽度
+          container.width // 容器限制
+          );
+          contentHeight = rowCount * maxItemHeight_1 + (rowCount - 1) * itemGap;
+        } else {
+          // 垂直布局：估算列数和总高度
+          var itemsPerCol = Math.floor(container.height / (maxItemHeight_1 + itemGap));
+          var colCount = Math.ceil(data.length / Math.max(1, itemsPerCol));
+          contentHeight = Math.min(data.length * (maxItemHeight_1 + itemGap) - itemGap,
+          // 单列最大高度
+          container.height // 容器限制
+          );
+          contentWidth = colCount * maxItemWidth_1 + (colCount - 1) * itemGap;
+        }
+      }
+      // 如果有 selector，估算其尺寸
+      var selectorWidth = 0;
+      var selectorHeight = 0;
+      if (selector) {
+        var selectorCount = isArray(selector) ? selector.length : 2; // 按钮数量
+        selectorWidth = orient === 'horizontal' ? selectorCount * 60 + (selectorCount - 1) * selectorItemGap : 60; // 估算按钮宽度
+        selectorHeight = orient === 'horizontal' ? 20 : selectorCount * 20 + (selectorCount - 1) * selectorItemGap; // 估算高度
+      }
+      // 总尺寸计算
+      var totalWidth = orient === 'horizontal' ? contentWidth + (selector ? selectorButtonGap + selectorWidth : 0) : Math.max(contentWidth, selectorWidth);
+      var totalHeight = orient === 'horizontal' ? Math.max(contentHeight, selectorHeight) : contentHeight + (selector ? selectorButtonGap + selectorHeight : 0);
+      return {
+        width: totalWidth,
+        height: totalHeight
+      };
+    }
+    /**
+     * 根据目标坐标系的位置，计算当前坐标系需要挤压的空间。
+     *
+     * @param originalContext 原始上下文
+     * @param coordSys 当前坐标系统
+     * @param targetCoordSys 目标坐标系统
+     * @param position 图例位置
+     * @returns 调整后的上下文，如果不需要调整则返回 undefined
+     */
+    function calculateAdjustedContextForCoordSys(originalContext, coordSys, targetRect, position) {
+      var originMargin = originalContext.margin;
+      // 如果原始上下文没有 margin，说明不需要调整
+      if (!originMargin || originMargin.every(function (m) {
+        return m === 0;
+      })) {
+        return undefined;
+      }
+      var coordSysRect = coordSys.getRect();
+      switch (position) {
+        case 'bottom':
+          {
+            // 计算当前坐标系统下边界到目标坐标系统下边界的距离
+            var coordSysBottom = coordSysRect.y + coordSysRect.height;
+            var targetBottom = targetRect.y + targetRect.height;
+            var distance = coordSysBottom - targetBottom;
+            if (distance >= 0 && distance < originMargin[2]) {
+              var adjustedMargin = __spreadArray([], originMargin, true);
+              adjustedMargin[2] = Math.max(0, originMargin[2] - distance);
+              return {
+                needLayout: false,
+                margin: adjustedMargin
+              };
+            }
+            break;
+          }
+        case 'top':
+          {
+            // 计算目标坐标系统上边界到当前坐标系统上边界的距离
+            var targetTop = targetRect.y;
+            var coordSysTop = coordSysRect.y;
+            var distance = coordSysTop - targetTop;
+            // 如果距离为正（当前坐标系统在目标上方），且距离小于需要的 margin
+            if (distance >= 0 && distance < originMargin[0]) {
+              // 需要调整 margin
+              var adjustedMargin = __spreadArray([], originMargin, true);
+              adjustedMargin[0] = Math.max(0, originMargin[0] - distance);
+              return {
+                needLayout: false,
+                margin: adjustedMargin
+              };
+            }
+            break;
+          }
+        case 'left':
+          {
+            // 计算目标坐标系统左边界到当前坐标系统左边界的距离
+            var targetLeft = targetRect.x;
+            var coordSysLeft = coordSysRect.x;
+            var distance = coordSysLeft - targetLeft;
+            // 如果距离为正（当前坐标系统在目标左侧），且距离小于需要的 margin
+            if (distance >= 0 && distance < originMargin[3]) {
+              // 需要调整 margin
+              var adjustedMargin = __spreadArray([], originMargin, true);
+              adjustedMargin[3] = Math.max(0, originMargin[3] - distance);
+              return {
+                needLayout: false,
+                margin: adjustedMargin
+              };
+            }
+            break;
+          }
+        case 'right':
+          {
+            // 计算当前坐标系统右边界到目标坐标系统右边界的距离
+            var coordSysRight = coordSysRect.x + coordSysRect.width;
+            var targetRight = targetRect.x + targetRect.width;
+            var distance = coordSysRight - targetRight;
+            // 如果距离为正（当前坐标系统在目标右侧），且距离小于需要的 margin
+            if (distance >= 0 && distance < originMargin[1]) {
+              // 需要调整 margin
+              var adjustedMargin = __spreadArray([], originMargin, true);
+              adjustedMargin[1] = Math.max(0, originMargin[1] - distance);
+              return {
+                needLayout: false,
+                margin: adjustedMargin
+              };
+            }
+            break;
+          }
+      }
+      // 如果不需要调整，返回 undefined
+      return undefined;
+    }
+    /**
+     * 处理无坐标系时的系列自动布局。
+     *
+     * @param autoLayoutGroups 自动布局组件分组。
+     * @param ecModel 全局模型。
+     * @param api 扩展API。
+     */
+    function handleSeriesAutoLayout(autoLayoutGroups, ecModel, api) {
+      var seriesList = ecModel.getSeries();
+      if (!seriesList || seriesList.length === 0) {
+        return;
+      }
+      var container = getViewSize(api);
+      if (!container) {
+        return;
+      }
+      // 为每个position的图例组件计算它对所有系列的影响
+      each$1(autoLayoutGroups, function (group, position) {
+        var _a;
+        // 根据position找到对应的目标系列
+        var targetSeries = findAutoLayoutSeriesForPosition(position, seriesList, api);
+        if (!targetSeries) {
+          return;
+        }
+        // 获取目标系列的视图
+        var targetSeriesView = api.getViewOfSeriesModel(targetSeries);
+        if (!targetSeriesView) {
+          return;
+        }
+        // 获取目标系列的外边界矩形
+        var targetRect = targetSeriesView.getOuterBoundingRect(targetSeries, ecModel, api, null);
+        if (!targetRect) {
+          return;
+        }
+        // 计算目标系列在该方向上需要压缩的尺寸
+        var targetContext = (_a = targetSeriesView.autoLayoutContext) !== null && _a !== void 0 ? _a : targetSeriesView.autoLayoutContext = {
+          needLayout: false
+        };
+        fillLegendGroupSpaceToMargin(group, api, targetRect, null, targetContext);
+        expandOrShrinkRect(targetRect, targetContext.margin, true, true);
+        // 完成图例的自动布局（使用压缩后的矩形）
+        layoutGroup(group, container, targetRect);
+        // 遍历其他系列，计算它们需要压缩的尺寸
+        seriesList.forEach(function (series) {
+          var seriesView = api.getViewOfSeriesModel(series);
+          if (!seriesView || seriesView === targetSeriesView) {
+            return; // 跳过无效视图或目标系列
+          }
+          // 根据目标系列的压缩尺寸计算其他系列的调整
+          var adjustedContext = calculateAdjustedContextForSeries(targetContext, series, seriesView, targetRect, position, api);
+          seriesView.autoLayoutContext = adjustedContext;
+        });
+      });
+    }
+    /**
+     * 计算系列的调整上下文。
+     *
+     * @param targetContext 目标系列的上下文。
+     * @param series 当前系列。
+     * @param seriesView 当前系列的视图。
+     * @param targetRect 目标系列的矩形。
+     * @param position 图例位置。
+     * @param api 扩展API。
+     * @returns 调整后的上下文，如果不需要调整则返回 undefined。
+     */
+    function calculateAdjustedContextForSeries(targetContext, series, seriesView, targetRect, position, api) {
+      var targetMargin = targetContext.margin;
+      // 如果目标上下文没有 margin，说明不需要调整
+      if (!targetMargin || targetMargin.every(function (m) {
+        return m === 0;
+      })) {
+        return undefined;
+      }
+      var seriesRect = seriesView.getOuterBoundingRect(series, series.ecModel, api, null);
+      if (!seriesRect) {
+        return undefined;
+      }
+      var needsAdjustment = false;
+      var adjustmentMargin = [0, 0, 0, 0];
+      switch (position) {
+        case 'bottom':
+          {
+            // 计算当前系列下边界到目标系列下边界的距离
+            var seriesBottom = seriesRect.y + seriesRect.height;
+            var targetBottom = targetRect.y + targetRect.height;
+            var distance = seriesBottom - targetBottom;
+            if (distance >= 0 && distance < targetMargin[2]) {
+              adjustmentMargin[2] = targetMargin[2] - distance;
+              needsAdjustment = true;
+            }
+            break;
+          }
+        case 'top':
+          {
+            // 计算目标系列上边界到当前系列上边界的距离
+            var targetTop = targetRect.y;
+            var seriesTop = seriesRect.y;
+            var distance = seriesTop - targetTop;
+            // 如果距离为正（当前系列在目标上方），且距离小于需要的 margin
+            if (distance >= 0 && distance < targetMargin[0]) {
+              adjustmentMargin[0] = targetMargin[0] - distance;
+              needsAdjustment = true;
+            }
+            break;
+          }
+        case 'left':
+          {
+            // 计算目标系列左边界到当前系列左边界的距离
+            var targetLeft = targetRect.x;
+            var seriesLeft = seriesRect.x;
+            var distance = seriesLeft - targetLeft;
+            // 如果距离为正（当前系列在目标左侧），且距离小于需要的 margin
+            if (distance >= 0 && distance < targetMargin[3]) {
+              adjustmentMargin[3] = targetMargin[3] - distance;
+              needsAdjustment = true;
+            }
+            break;
+          }
+        case 'right':
+          {
+            // 计算当前系列右边界到目标系列右边界的距离
+            var seriesRight = seriesRect.x + seriesRect.width;
+            var targetRight = targetRect.x + targetRect.width;
+            var distance = seriesRight - targetRight;
+            // 如果距离为正（当前系列在目标右侧），且距离小于需要的 margin
+            if (distance >= 0 && distance < targetMargin[1]) {
+              adjustmentMargin[1] = targetMargin[1] - distance;
+              needsAdjustment = true;
+            }
+            break;
+          }
+      }
+      // 只有当需要调整时才创建/更新context
+      if (needsAdjustment) {
+        // 获取或创建系列的context
+        var seriesContext = seriesView.autoLayoutContext;
+        if (!seriesContext) {
+          seriesContext = {
+            needLayout: false,
+            margin: [0, 0, 0, 0]
+          };
+          seriesView.autoLayoutContext = seriesContext;
+        }
+        // 确保margin数组存在
+        if (!seriesContext.margin) {
+          seriesContext.margin = [0, 0, 0, 0];
+        }
+        // 累加调整的margin
+        for (var i = 0; i < 4; i++) {
+          seriesContext.margin[i] = Math.max(seriesContext.margin[i], adjustmentMargin[i]);
+        }
+        return seriesContext;
+      }
+      return undefined;
+    }
+    /**
+     * 计算包含标签的扩展边界矩形。
+     *
+     * 参考 calculateGridRectWithAxisLabels 的实现，计算包含基础边界矩形和标签边界矩形的联合矩形。
+     *
+     * @param baseRect 基础边界矩形（例如扇形或图形元素的边界矩形）
+     * @param labelLayouts 标签布局列表，每个布局包含 rect 属性
+     * @returns 包含所有标签的扩展边界矩形
+     */
+    function calculateOuterBoundingRectWithLabels(baseRect, labelLayouts) {
+      var minX = baseRect.x;
+      var minY = baseRect.y;
+      var maxX = baseRect.x + baseRect.width;
+      var maxY = baseRect.y + baseRect.height;
+      // 遍历所有标签布局，逐个处理标签的边界
+      if (labelLayouts) {
+        for (var idx = 0; idx < labelLayouts.length; idx++) {
+          var labelLayout = labelLayouts[idx];
+          var rect = labelLayout.rect;
+          // 跳过无效的矩形
+          if (rect.width <= 0 || rect.height <= 0) {
+            continue;
+          }
+          minX = Math.min(minX, rect.x);
+          minY = Math.min(minY, rect.y);
+          maxX = Math.max(maxX, rect.x + rect.width);
+          maxY = Math.max(maxY, rect.y + rect.height);
+        }
+      }
+      return new zrender_js.BoundingRect(minX, minY, maxX - minX, maxY - minY);
+    }
+    /**
+     * 默认布局配置。
+     */
+    var DEFAULT_LAYOUT_CONFIG = {
+      marginToGrid: tokens.size.s,
+      itemGap: tokens.size.xxs
+    };
+
     /**
      * FIXME:
      * `nonSeriesBoxCoordSysCreators` and `_nonSeriesBoxMasterList` are hardcoded implementations.
@@ -17223,9 +18919,51 @@
       /**
        * @see CoordinateSystem['create']
        */
-      CoordinateSystemManager.prototype.update = function (ecModel, api) {
-        each(this._normalMasterList, function (coordSys) {
-          coordSys.update && coordSys.update(ecModel, api);
+      CoordinateSystemManager.prototype.update = function (ecModel, api, autoLayoutMgr) {
+        // 收集自动布局组件并准备
+        var hasCoordSys = this._normalMasterList && this._normalMasterList.length > 0;
+        var needsAutoLayout = autoLayoutMgr && autoLayoutMgr.collectAndPrepare(ecModel, api, hasCoordSys);
+        if (!needsAutoLayout) {
+          // 正常调用所有坐标系统的update
+          each(this._normalMasterList, function (coordSys) {
+            coordSys.update && coordSys.update(ecModel, api);
+          });
+          return;
+        }
+        var _normalMasterList = this._normalMasterList;
+        if (!_normalMasterList || _normalMasterList.length === 0) {
+          // 无坐标系：不在此执行，等待视觉任务后由 AutoLayoutManager 执行系列布局
+          return;
+        }
+        var groups = autoLayoutMgr.getGroups();
+        if (!groups) {
+          each(this._normalMasterList, function (coordSys) {
+            coordSys.update && coordSys.update(ecModel, api);
+          });
+          return;
+        }
+        Object.keys(groups).forEach(function (position) {
+          var context = autoLayoutMgr.prepareCoordSysContext(position, _normalMasterList);
+          if (!context) {
+            return;
+          }
+          if (_normalMasterList.length === 1) {
+            var targetGrid = _normalMasterList[0];
+            targetGrid.autoLayoutContext = context;
+            targetGrid.update && targetGrid.update(ecModel, api);
+          } else {
+            var targetGrid_1 = findAutoLayoutCoordForPosition(position, _normalMasterList);
+            var targetRect_1 = targetGrid_1.getRect();
+            targetGrid_1.autoLayoutContext = context;
+            targetGrid_1.update && targetGrid_1.update(ecModel, api);
+            each(_normalMasterList, function (coordSys) {
+              if (coordSys === targetGrid_1) {
+                return;
+              }
+              coordSys.autoLayoutContext = calculateAdjustedContextForCoordSys(context, coordSys, targetRect_1, position);
+              coordSys.update && coordSys.update(ecModel, api);
+            });
+          }
         });
       };
       CoordinateSystemManager.prototype.getCoordinateSystems = function () {
@@ -17432,7 +19170,7 @@
       return true;
     }
 
-    var each$1 = each;
+    var each$2 = each;
     /**
      * @public
      */
@@ -17866,10 +19604,10 @@
         var merged = {};
         var mergedValueCount = 0;
         var enoughParamNumber = 2;
-        each$1(names, function (name) {
+        each$2(names, function (name) {
           merged[name] = targetOption[name];
         });
-        each$1(names, function (name) {
+        each$2(names, function (name) {
           // Consider case: newOption.width is null, which is
           // set by user for removing width setting.
           hasOwn(newOption, name) && (newParams[name] = merged[name] = newOption[name]);
@@ -17913,7 +19651,7 @@
         return obj[name] != null && obj[name] !== 'auto';
       }
       function copy(names, target, source) {
-        each$1(names, function (name) {
+        each$2(names, function (name) {
           target[name] = source[name];
         });
       }
@@ -17930,7 +19668,7 @@
      * @return {Object} Result contains those props.
      */
     function copyLayoutParams(target, source) {
-      source && target && each$1(LOCATION_PARAMS, function (name) {
+      source && target && each$2(LOCATION_PARAMS, function (name) {
         hasOwn(source, name) && (target[name] = source[name]);
       });
       return target;
@@ -18113,114 +19851,6 @@
       }
       return deps;
     }
-
-    var tokens = {
-      color: {},
-      darkColor: {},
-      size: {}
-    };
-    var color$1 = tokens.color = {
-      theme: ['#5070dd', '#b6d634', '#505372', '#ff994d', '#0ca8df', '#ffd10a', '#fb628b', '#785db0', '#3fbe95'],
-      neutral00: '#fff',
-      neutral05: '#f4f7fd',
-      neutral10: '#e8ebf0',
-      neutral15: '#dbdee4',
-      neutral20: '#cfd2d7',
-      neutral25: '#c3c5cb',
-      neutral30: '#b7b9be',
-      neutral35: '#aaacb2',
-      neutral40: '#9ea0a5',
-      neutral45: '#929399',
-      neutral50: '#86878c',
-      neutral55: '#797b7f',
-      neutral60: '#6d6e73',
-      neutral65: '#616266',
-      neutral70: '#54555a',
-      neutral75: '#48494d',
-      neutral80: '#3c3c41',
-      neutral85: '#303034',
-      neutral90: '#232328',
-      neutral95: '#17171b',
-      neutral99: '#000',
-      accent05: '#eff1f9',
-      accent10: '#e0e4f2',
-      accent15: '#d0d6ec',
-      accent20: '#c0c9e6',
-      accent25: '#b1bbdf',
-      accent30: '#a1aed9',
-      accent35: '#91a0d3',
-      accent40: '#8292cc',
-      accent45: '#7285c6',
-      accent50: '#6578ba',
-      accent55: '#5c6da9',
-      accent60: '#536298',
-      accent65: '#4a5787',
-      accent70: '#404c76',
-      accent75: '#374165',
-      accent80: '#2e3654',
-      accent85: '#252b43',
-      accent90: '#1b2032',
-      accent95: '#121521',
-      transparent: 'rgba(0,0,0,0)',
-      highlight: 'rgba(255,231,130,0.8)'
-    };
-    extend(color$1, {
-      primary: color$1.neutral80,
-      secondary: color$1.neutral70,
-      tertiary: color$1.neutral60,
-      quaternary: color$1.neutral50,
-      disabled: color$1.neutral20,
-      border: color$1.neutral30,
-      borderTint: color$1.neutral20,
-      borderShade: color$1.neutral40,
-      background: color$1.neutral05,
-      backgroundTint: 'rgba(234,237,245,0.5)',
-      backgroundTransparent: 'rgba(255,255,255,0)',
-      backgroundShade: color$1.neutral10,
-      shadow: 'rgba(0,0,0,0.2)',
-      shadowTint: 'rgba(129,130,136,0.2)',
-      axisLine: color$1.neutral70,
-      axisLineTint: color$1.neutral40,
-      axisTick: color$1.neutral70,
-      axisTickMinor: color$1.neutral60,
-      axisLabel: color$1.neutral70,
-      axisSplitLine: color$1.neutral15,
-      axisMinorSplitLine: color$1.neutral05
-    });
-    for (var key in color$1) {
-      if (color$1.hasOwnProperty(key)) {
-        var hex = color$1[key];
-        if (key === 'theme') {
-          // Don't modify theme colors.
-          tokens.darkColor.theme = color$1.theme.slice();
-        } else if (key === 'highlight') {
-          tokens.darkColor.highlight = 'rgba(255,231,130,0.4)';
-        } else if (key.indexOf('accent') === 0) {
-          // Desaturate and lighten accent colors.
-          tokens.darkColor[key] = modifyHSL(hex, null, function (s) {
-            return s * 0.5;
-          }, function (l) {
-            return Math.min(1, 1.3 - l);
-          });
-        } else {
-          tokens.darkColor[key] = modifyHSL(hex, null, function (s) {
-            return s * 0.9;
-          }, function (l) {
-            return 1 - Math.pow(l, 1.5);
-          });
-        }
-      }
-    }
-    tokens.size = {
-      xxs: 2,
-      xs: 5,
-      s: 10,
-      m: 15,
-      l: 20,
-      xl: 30,
-      xxl: 40,
-      xxxl: 50
-    };
 
     var platform = '';
     // Navigator not exists in node
@@ -19728,7 +21358,7 @@
       return indices1.join(',') === indices2.join(',');
     }
 
-    var each$2 = each;
+    var each$3 = each;
     var isObject$1 = isObject;
     var POSSIBLE_STYLES = ['areaStyle', 'lineStyle', 'nodeStyle', 'linkStyle', 'chordStyle', 'label', 'labelLine'];
     function compatEC2ItemStyle(opt) {
@@ -19930,32 +21560,32 @@
       return (isArray(o) ? o[0] : o) || {};
     }
     function globalCompatStyle(option, isTheme) {
-      each$2(toArr(option.series), function (seriesOpt) {
+      each$3(toArr(option.series), function (seriesOpt) {
         isObject$1(seriesOpt) && processSeries(seriesOpt);
       });
       var axes = ['xAxis', 'yAxis', 'radiusAxis', 'angleAxis', 'singleAxis', 'parallelAxis', 'radar'];
       isTheme && axes.push('valueAxis', 'categoryAxis', 'logAxis', 'timeAxis');
-      each$2(axes, function (axisName) {
-        each$2(toArr(option[axisName]), function (axisOpt) {
+      each$3(axes, function (axisName) {
+        each$3(toArr(option[axisName]), function (axisOpt) {
           if (axisOpt) {
             compatTextStyle(axisOpt, 'axisLabel');
             compatTextStyle(axisOpt.axisPointer, 'label');
           }
         });
       });
-      each$2(toArr(option.parallel), function (parallelOpt) {
+      each$3(toArr(option.parallel), function (parallelOpt) {
         var parallelAxisDefault = parallelOpt && parallelOpt.parallelAxisDefault;
         compatTextStyle(parallelAxisDefault, 'axisLabel');
         compatTextStyle(parallelAxisDefault && parallelAxisDefault.axisPointer, 'label');
       });
-      each$2(toArr(option.calendar), function (calendarOpt) {
+      each$3(toArr(option.calendar), function (calendarOpt) {
         convertNormalEmphasis(calendarOpt, 'itemStyle');
         compatTextStyle(calendarOpt, 'dayLabel');
         compatTextStyle(calendarOpt, 'monthLabel');
         compatTextStyle(calendarOpt, 'yearLabel');
       });
       // radar.name.textStyle
-      each$2(toArr(option.radar), function (radarOpt) {
+      each$3(toArr(option.radar), function (radarOpt) {
         compatTextStyle(radarOpt, 'name');
         // Use axisName instead of name because component has name property
         if (radarOpt.name && radarOpt.axisName == null) {
@@ -19973,22 +21603,22 @@
           }
         }
         if ("development" !== 'production') {
-          each$2(radarOpt.indicator, function (indicatorOpt) {
+          each$3(radarOpt.indicator, function (indicatorOpt) {
             if (indicatorOpt.text) {
               deprecateReplaceLog('text', 'name', 'radar.indicator');
             }
           });
         }
       });
-      each$2(toArr(option.geo), function (geoOpt) {
+      each$3(toArr(option.geo), function (geoOpt) {
         if (isObject$1(geoOpt)) {
           compatEC3CommonStyles(geoOpt);
-          each$2(toArr(geoOpt.regions), function (regionObj) {
+          each$3(toArr(geoOpt.regions), function (regionObj) {
             compatEC3CommonStyles(regionObj);
           });
         }
       });
-      each$2(toArr(option.timeline), function (timelineOpt) {
+      each$3(toArr(option.timeline), function (timelineOpt) {
         compatEC3CommonStyles(timelineOpt);
         convertNormalEmphasis(timelineOpt, 'label');
         convertNormalEmphasis(timelineOpt, 'itemStyle');
@@ -20001,9 +21631,9 @@
           }
         });
       });
-      each$2(toArr(option.toolbox), function (toolboxOpt) {
+      each$3(toArr(option.toolbox), function (toolboxOpt) {
         convertNormalEmphasis(toolboxOpt, 'iconStyle');
-        each$2(toolboxOpt.feature, function (featureOpt) {
+        each$3(toolboxOpt.feature, function (featureOpt) {
           convertNormalEmphasis(featureOpt, 'iconStyle');
         });
       });
@@ -25233,6 +26863,16 @@
       toolbox: {
         iconStyle: {
           borderColor: color$2.accent50
+        },
+        feature: {
+          dataView: {
+            backgroundColor: backgroundColor,
+            textColor: color$2.primary,
+            textareaColor: color$2.background,
+            textareaBorderColor: color$2.border,
+            buttonColor: color$2.accent50,
+            buttonTextColor: color$2.neutral00
+          }
         }
       },
       tooltip: {
@@ -27338,6 +28978,8 @@
         // Can't dispatch action during rendering procedure
         _this._pendingActions = [];
         opts = opts || {};
+        // mark the echarts instance as raw in Vue 3 to prevent the object being converted to be a proxy.
+        _this.__v_skip = true;
         _this._dom = dom;
         var defaultRenderer = 'canvas';
         var defaultCoarsePointer = 'auto';
@@ -27382,6 +29024,7 @@
         _this._updateTheme(theme);
         _this._locale = createLocaleObject(opts.locale || SYSTEM_LANG);
         _this._coordSysMgr = new CoordinateSystemManager();
+        _this._autoLayoutMgr = new AutoLayoutManager();
         var api = _this._api = createExtensionAPI(_this);
         // Sort on demand
         function prioritySortFunc(a, b) {
@@ -28364,9 +30007,11 @@
             // can be fetched when coord sys updating (consider the barGrid extent fix). But
             // the drawback is the full coord info can not be fetched. Fortunately this full
             // coord is not required in stream mode updater currently.
-            coordSysMgr.update(ecModel, api);
+            coordSysMgr.update(ecModel, api, this._autoLayoutMgr);
             clearColorPalette(ecModel);
             scheduler.performVisualTasks(ecModel, payload);
+            // 无坐标系场景：在视觉任务之后执行系列级自动布局
+            this._autoLayoutMgr.executeSeriesLayout(ecModel, api);
             // Set background and dark mode before rendering, because they affect auto-color-determination
             // in zrender Text, and consequently affect the bounding rect if stroke is added.
             var backgroundColor = ecModel.get('backgroundColor') || 'transparent';
@@ -34629,16 +36274,17 @@
         var labelFormatter_1 = makeLabelFormatter(axis);
         var extent_1 = axis.scale.getExtent();
         var tickNumbers = tickValuesToNumbers(axis, custom);
-        var ticks = filter(tickNumbers, function (val) {
+        var ticks_1 = filter(tickNumbers, function (val) {
           return val >= extent_1[0] && val <= extent_1[1];
         });
         return {
-          labels: map(ticks, function (numval) {
+          labels: map(ticks_1, function (numval) {
             var tick = {
               value: numval
             };
+            var index = ticks_1.indexOf(numval);
             return {
-              formattedLabel: labelFormatter_1(tick),
+              formattedLabel: labelFormatter_1(tick, index),
               rawLabel: axis.scale.getLabel(tick),
               tickValue: numval,
               time: undefined,
@@ -37531,7 +39177,7 @@
         return newDom;
     }
     var Layer = (function (_super) {
-        __extends(Layer, _super);
+        __extends$1(Layer, _super);
         function Layer(id, painter, dpr) {
             var _this = _super.call(this) || this;
             _this.motionBlur = false;
@@ -39712,7 +41358,7 @@
       return isNumber(smooth) ? smooth : smooth ? 0.5 : 0;
     }
     function getStackedOnPoints(coordSys, data, dataCoordInfo) {
-      if (!dataCoordInfo.valueDim) {
+      if (dataCoordInfo.valueDim == null) {
         return [];
       }
       var len = data.count();
@@ -41970,7 +43616,7 @@
       el.useStyle(style);
       var cursorStyle = itemModel.getShallow('cursor');
       cursorStyle && el.attr('cursor', cursorStyle);
-      var labelPositionOutside = isPolar ? isHorizontalOrRadial ? layout.r >= layout.r0 ? 'endArc' : 'startArc' : layout.endAngle >= layout.startAngle ? 'endAngle' : 'startAngle' : isHorizontalOrRadial ? layout.height >= 0 ? 'bottom' : 'top' : layout.width >= 0 ? 'right' : 'left';
+      var labelPositionOutside = isPolar ? isHorizontalOrRadial ? layout.r >= layout.r0 ? 'endArc' : 'startArc' : layout.endAngle >= layout.startAngle ? 'endAngle' : 'startAngle' : isHorizontalOrRadial ? getLabelPositionForHorizontal(layout, seriesModel.coordinateSystem) : getLabelPositionForVertical(layout, seriesModel.coordinateSystem);
       var labelStatesModels = getLabelStatesModels(itemModel);
       setLabelStyle(el, labelStatesModels, {
         labelFetcher: seriesModel,
@@ -42155,6 +43801,22 @@
         silent: true,
         z2: 0
       });
+    }
+    function getLabelPositionForHorizontal(layout, coordSys) {
+      if (layout.height === 0) {
+        // For zero height, determine position based on axis inverse status
+        var valueAxis = coordSys.getOtherAxis(coordSys.getBaseAxis());
+        return valueAxis.inverse ? 'bottom' : 'top';
+      }
+      return layout.height > 0 ? 'bottom' : 'top';
+    }
+    function getLabelPositionForVertical(layout, coordSys) {
+      if (layout.width === 0) {
+        // For zero width, determine position based on axis inverse status
+        var valueAxis = coordSys.getOtherAxis(coordSys.getBaseAxis());
+        return valueAxis.inverse ? 'left' : 'right';
+      }
+      return layout.width >= 0 ? 'right' : 'left';
     }
 
     function install$3(registers) {
@@ -42838,6 +44500,7 @@
           }
         }
       }
+      return labelLayoutList;
     }
 
     /**
@@ -43007,6 +44670,35 @@
       }
       PieView.prototype.render = function (seriesModel, ecModel, api, payload) {
         var data = seriesModel.getData();
+        // Apply autoLayoutContext margin if available
+        var autoLayoutContext = this.autoLayoutContext;
+        if (autoLayoutContext === null || autoLayoutContext === void 0 ? void 0 : autoLayoutContext.margin) {
+          var margin = autoLayoutContext.margin;
+          var maxMargin_1 = Math.max(margin[0], margin[1], margin[2], margin[3]);
+          // Only apply adjustment if margin is non-zero
+          if (maxMargin_1 > 0) {
+            var layoutData = getSeriesLayoutData(seriesModel);
+            var newR = layoutData.r - maxMargin_1;
+            layoutData.r = newR;
+            data.each(function (idx) {
+              var itemLayout = data.getItemLayout(idx);
+              if (itemLayout) {
+                itemLayout.r -= maxMargin_1;
+              }
+            });
+            // Update data layout for labelLayout to use
+            var originalViewRect = data.getLayout('viewRect');
+            if (originalViewRect) {
+              data.setLayout({
+                r: newR
+              });
+            } else {
+              data.setLayout({
+                r: newR
+              });
+            }
+          }
+        }
         var oldData = this._data;
         var group = this.group;
         var startAngle;
@@ -43053,6 +44745,15 @@
         if (seriesModel.get('animationTypeUpdate') !== 'expansion') {
           this._data = data;
         }
+      };
+      PieView.prototype.getOuterBoundingRect = function (seriesModel, ecModel, api, payload) {
+        // 获取饼图扇形的边界矩形
+        var sectorRect = this.group.getBoundingRect();
+        // 重新计算标签布局以获取干净的标签边界信息
+        var labelLayoutList = pieLabelLayout(seriesModel);
+        // 获取包含标签的扩展边界矩形
+        var outerBoundingRect = calculateOuterBoundingRectWithLabels(sectorRect, labelLayoutList);
+        return outerBoundingRect;
       };
       PieView.prototype.dispose = function () {};
       PieView.prototype.containPoint = function (point, seriesModel) {
@@ -45759,7 +47460,7 @@
               if ("development" !== 'production') {
                 log('Specified `grid.containLabel` but no `use(LegacyGridContainLabel)`;' + 'use `grid.outerBounds` instead.', true);
               }
-              noPxChange = layOutGridByOuterBounds(gridRect.clone(), 'axisLabel', null, gridRect, axesMap, axisBuilderSharedCtx, layoutRef);
+              noPxChange = layOutGridByOuterBounds(gridRect.clone(), 'axisLabel', null, gridRect, axesMap, axisBuilderSharedCtx, layoutRef, api, this);
             }
           } else {
             var _a = prepareOuterBounds(gridModel, gridRect, layoutRef),
@@ -45768,7 +47469,7 @@
               outerBoundsClamp = _a.outerBoundsClamp;
             if (outerBoundsRect) {
               // console.time('layOutGridByOuterBounds');
-              noPxChange = layOutGridByOuterBounds(outerBoundsRect, parsedOuterBoundsContain, outerBoundsClamp, gridRect, axesMap, axisBuilderSharedCtx, layoutRef);
+              noPxChange = layOutGridByOuterBounds(outerBoundsRect, parsedOuterBoundsContain, outerBoundsClamp, gridRect, axesMap, axisBuilderSharedCtx, layoutRef, api, this);
               // console.timeEnd('layOutGridByOuterBounds');
             }
           }
@@ -46119,7 +47820,7 @@
       updateAxisTransform(axis, gridXY);
     }
     // Return noPxChange.
-    function layOutGridByOuterBounds(outerBoundsRect, outerBoundsContain, outerBoundsClamp, gridRect, axesMap, axisBuilderSharedCtx, layoutRef) {
+    function layOutGridByOuterBounds(outerBoundsRect, outerBoundsContain, outerBoundsClamp, gridRect, axesMap, axisBuilderSharedCtx, layoutRef, api, grid) {
       if ("development" !== 'production') {
         assert(outerBoundsContain === 'all' || outerBoundsContain === 'axisLabel');
       }
@@ -46138,12 +47839,81 @@
       // gridRect itself should not overflow.
       fillMarginOnOneDimension(gridRect, 0, NaN);
       fillMarginOnOneDimension(gridRect, 1, NaN);
+      var autoLayoutContext = grid.autoLayoutContext;
+      var gridRectWithAxisLabels;
+      if (autoLayoutContext != null) {
+        if (autoLayoutContext.needLayout) {
+          gridRectWithAxisLabels = calculateGridRectWithAxisLabels(gridRect, axesMap, axisBuilderSharedCtx);
+          fillLegendGroupSpaceToMargin(autoLayoutContext.group, api, gridRectWithAxisLabels, margin, autoLayoutContext);
+        }
+        var contextMargin = autoLayoutContext.margin;
+        if (autoLayoutContext.margin != null) {
+          // 将计算好的margin应用到布局的margin中
+          margin[0] += contextMargin[0]; // top
+          margin[1] += contextMargin[1]; // right
+          margin[2] += contextMargin[2]; // bottom
+          margin[3] += contextMargin[3]; // left
+        }
+      }
       var noPxChange = find(margin, function (item) {
         return item > 0;
       }) == null;
       expandOrShrinkRect(gridRect, margin, true, true, outerBoundsClamp);
       updateAllAxisExtentTransByGridRect(axesMap, gridRect);
+      // 在 grid 布局完成后，基于最终的 gridRect 设置自动布局的图例位置
+      if ((autoLayoutContext === null || autoLayoutContext === void 0 ? void 0 : autoLayoutContext.needLayout) === true) {
+        expandOrShrinkRect(gridRectWithAxisLabels, margin, true, true, outerBoundsClamp);
+        layoutGroup(autoLayoutContext.group, {
+          width: api.getWidth(),
+          height: api.getHeight()
+        }, gridRectWithAxisLabels);
+      }
       return noPxChange;
+      function calculateGridRectWithAxisLabels(gridRect, axesMap, axisBuilderSharedCtx) {
+        // 参考 fillLabelNameOverflowOnOneDimension 的实现，逐个处理而不是使用 union
+        var minX = gridRect.x;
+        var minY = gridRect.y;
+        var maxX = gridRect.x + gridRect.width;
+        var maxY = gridRect.y + gridRect.height;
+        // 遍历所有轴，逐个处理标签和名称的边界
+        each(axesMap, function (axisList) {
+          each(axisList, function (axis) {
+            if (!shouldAxisShow(axis.model)) {
+              return;
+            }
+            var sharedRecord = axisBuilderSharedCtx.ensureRecord(axis.model);
+            var labelInfoList = sharedRecord.labelInfoList;
+            if (labelInfoList) {
+              for (var idx = 0; idx < labelInfoList.length; idx++) {
+                var labelInfo = labelInfoList[idx];
+                var rect = labelInfo.rect;
+                // 跳过无效的矩形
+                if (rect.width <= 0 || rect.height <= 0) {
+                  continue;
+                }
+                minX = Math.min(minX, rect.x);
+                minY = Math.min(minY, rect.y);
+                maxX = Math.max(maxX, rect.x + rect.width);
+                maxY = Math.max(maxY, rect.y + rect.height);
+              }
+            }
+            var nameLayout = sharedRecord.nameLayout;
+            if (nameLayout) {
+              var rect = nameLayout.rect;
+              // 跳过无效的矩形
+              if (rect.width > 0 && rect.height > 0) {
+                minX = Math.min(minX, rect.x);
+                minY = Math.min(minY, rect.y);
+                maxX = Math.max(maxX, rect.x + rect.width);
+                maxY = Math.max(maxY, rect.y + rect.height);
+              }
+            }
+          });
+        });
+        var unionRect = new BoundingRect(minX, minY, maxX - minX, maxY - minY);
+        unionRect.margin = gridRect.margin;
+        return unionRect;
+      }
       function fillLabelNameOverflowOnOneDimension(xyIdx) {
         each(axesMap[XY$1[xyIdx]], function (axis) {
           if (!shouldAxisShow(axis.model)) {
@@ -47585,7 +49355,7 @@
     }(ComponentModel);
 
     var inner$7 = makeInner();
-    var each$3 = each;
+    var each$4 = each;
     /**
      * @param {string} key
      * @param {module:echarts/ExtensionAPI} api
@@ -47615,7 +49385,7 @@
       function useHandler(eventType, cb) {
         zr.on(eventType, function (e) {
           var dis = makeDispatchAction(api);
-          each$3(inner$7(zr).records, function (record) {
+          each$4(inner$7(zr).records, function (record) {
             record && cb(record, e, dis.dispatchAction);
           });
           dispatchTooltipFinally(dis.pendings, api);
@@ -49987,7 +51757,7 @@
       return Math.min(extend[1] != null ? extend[1] : Infinity, Math.max(extend[0] != null ? extend[0] : -Infinity, value));
     }
 
-    var each$4 = each;
+    var each$5 = each;
     var asc$1 = asc;
     /**
      * Operate single axis.
@@ -50057,7 +51827,7 @@
         var percentWindow = [];
         var valueWindow = [];
         var hasPropModeValue;
-        each$4(['start', 'end'], function (prop, idx) {
+        each$5(['start', 'end'], function (prop, idx) {
           var boundPercent = opt[prop];
           var boundValue = opt[prop + 'Value'];
           // Notice: dataZoom is based either on `percentProp` ('start', 'end') or
@@ -50163,7 +51933,7 @@
         // }
         // TODO
         // filterMode 'weakFilter' and 'empty' is not optimized for huge data yet.
-        each$4(seriesModels, function (seriesModel) {
+        each$5(seriesModels, function (seriesModel) {
           var seriesData = seriesModel.getData();
           var dataDims = seriesData.mapDimensionsAll(axisDim);
           if (!dataDims.length) {
@@ -50194,7 +51964,7 @@
               return hasValue && leftOut && rightOut;
             });
           } else {
-            each$4(dataDims, function (dim) {
+            each$5(dataDims, function (dim) {
               if (filterMode === 'empty') {
                 seriesModel.setData(seriesData = seriesData.map(dim, function (value) {
                   return !isInWindow(value) ? NaN : value;
@@ -50208,7 +51978,7 @@
               }
             });
           }
-          each$4(dataDims, function (dim) {
+          each$5(dataDims, function (dim) {
             seriesData.setApproximateExtent(valueWindow, dim);
           });
         });
@@ -50220,7 +51990,7 @@
         var minMaxSpan = this._minMaxSpan = {};
         var dataZoomModel = this._dataZoomModel;
         var dataExtent = this._dataExtent;
-        each$4(['min', 'max'], function (minMax) {
+        each$5(['min', 'max'], function (minMax) {
           var percentSpan = dataZoomModel.get(minMax + 'Span');
           var valueSpan = dataZoomModel.get(minMax + 'ValueSpan');
           valueSpan != null && (valueSpan = this.getAxisModel().axis.scale.parse(valueSpan));
@@ -50261,7 +52031,7 @@
     }();
     function calculateDataExtent(axisProxy, axisDim, seriesModels) {
       var dataExtent = [Infinity, -Infinity];
-      each$4(seriesModels, function (seriesModel) {
+      each$5(seriesModels, function (seriesModel) {
         unionAxisExtentFromData(dataExtent, seriesModel.getData(), axisDim);
       });
       // It is important to get "consistent" extent when more then one axes is
@@ -51417,7 +53187,7 @@
       }, payload.newOption));
     });
 
-    var each$5 = each;
+    var each$6 = each;
     var inner$a = makeInner();
     /**
      * @param ecModel
@@ -51427,7 +53197,7 @@
       var storedSnapshots = getStoreSnapshots(ecModel);
       // If previous dataZoom can not be found,
       // complete an range with current range.
-      each$5(newSnapshot, function (batchItem, dataZoomId) {
+      each$6(newSnapshot, function (batchItem, dataZoomId) {
         var i = storedSnapshots.length - 1;
         for (; i >= 0; i--) {
           var snapshot = storedSnapshots[i];
@@ -51460,7 +53230,7 @@
       storedSnapshots.length > 1 && storedSnapshots.pop();
       // Find top for all dataZoom.
       var snapshot = {};
-      each$5(head, function (batchItem, dataZoomId) {
+      each$6(head, function (batchItem, dataZoomId) {
         for (var i = storedSnapshots.length - 1; i >= 0; i--) {
           batchItem = storedSnapshots[i][dataZoomId];
           if (batchItem) {
@@ -52604,7 +54374,7 @@
       return xyMinMax ? [xyMinMax[0][1] - xyMinMax[0][0], xyMinMax[1][1] - xyMinMax[1][0]] : [NaN, NaN];
     }
 
-    var each$6 = each;
+    var each$7 = each;
     var DATA_ZOOM_ID_BASE = makeInternalComponentId('toolbox-dataZoom_');
     var DataZoomFeature = /** @class */function (_super) {
       __extends(DataZoomFeature, _super);
@@ -52686,7 +54456,7 @@
       DataZoomFeature.prototype._dispatchZoomAction = function (snapshot) {
         var batch = [];
         // Convert from hash map to array.
-        each$6(snapshot, function (batchItem, dataZoomId) {
+        each$7(snapshot, function (batchItem, dataZoomId) {
           batch.push(clone(batchItem));
         });
         batch.length && this.api.dispatchAction({
@@ -52778,10 +54548,10 @@
       var dzOptions = [];
       var finder = makeAxisFinder(dzFeatureModel);
       var finderResult = parseFinder(ecModel, finder);
-      each$6(finderResult.xAxisModels, function (axisModel) {
+      each$7(finderResult.xAxisModels, function (axisModel) {
         return buildInternalOptions(axisModel, 'xAxis', 'xAxisIndex');
       });
-      each$6(finderResult.yAxisModels, function (axisModel) {
+      each$7(finderResult.yAxisModels, function (axisModel) {
         return buildInternalOptions(axisModel, 'yAxis', 'yAxisIndex');
       });
       function buildInternalOptions(axisModel, axisMainType, axisIndexPropName) {
@@ -56287,11 +58057,13 @@
         return _this;
       }
       LegendModel.prototype.init = function (option, parentModel, ecModel) {
+        preprocessAutoLayoutOption(this.option);
         this.mergeDefaultAndTheme(option, ecModel);
         option.selected = option.selected || {};
         this._updateSelector(option);
       };
       LegendModel.prototype.mergeOption = function (option, ecModel) {
+        preprocessAutoLayoutOption(this.option);
         _super.prototype.mergeOption.call(this, option, ecModel);
         this._updateSelector(option);
       };
@@ -56445,6 +58217,16 @@
           name: 'horizontal'
         };
       };
+      /** @implements AutoLayoutComponentModel */
+      LegendModel.prototype.setAutoLayoutBoxParams = function (params) {
+        this._autoLayoutBoxParams = params;
+      };
+      LegendModel.prototype.getBoxLayoutParams = function () {
+        if (this._autoLayoutBoxParams) {
+          return this._autoLayoutBoxParams;
+        }
+        return _super.prototype.getBoxLayoutParams.call(this);
+      };
       LegendModel.type = 'legend.plain';
       LegendModel.dependencies = ['series'];
       LegendModel.defaultOption = {
@@ -56519,13 +58301,20 @@
         tooltip: {
           show: false
         },
-        triggerEvent: false
+        triggerEvent: false,
+        // 自动布局默认配置
+        autoLayout: {
+          enable: false,
+          position: 'bottom',
+          align: 'center',
+          layoutMode: 'multiLine'
+        }
       };
       return LegendModel;
     }(ComponentModel);
 
     var curry$1 = curry;
-    var each$7 = each;
+    var each$8 = each;
     var Group$1 = Group;
     var LegendView = /** @class */function (_super) {
       __extends(LegendView, _super);
@@ -56562,17 +58351,10 @@
         if (!legendModel.get('show', true)) {
           return;
         }
-        var itemAlign = legendModel.get('align');
         var orient = legendModel.get('orient');
-        if (!itemAlign || itemAlign === 'auto') {
-          itemAlign = legendModel.get('left') === 'right' && orient === 'vertical' ? 'right' : 'left';
-        }
-        // selector has been normalized to an array in model
+        var itemAlign = this.calculateItemAlign(legendModel, orient);
         var selector = legendModel.get('selector', true);
-        var selectorPosition = legendModel.get('selectorPosition', true);
-        if (selector && (!selectorPosition || selectorPosition === 'auto')) {
-          selectorPosition = orient === 'horizontal' ? 'end' : 'start';
-        }
+        var selectorPosition = this.calculateSelectorPosition(legendModel, orient, selector);
         this.renderInner(itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition);
         // Perform layout.
         var refContainer = createBoxLayoutReference(legendModel, api).refContainer;
@@ -56593,10 +58375,200 @@
         // FXIME: most itemStyle options does not work in background because inherit is not handled yet.
         legendModel));
       };
+      LegendView.prototype.renderForEstimate = function (legendModel, ecModel, api) {
+        if (!legendModel.get('show', true)) {
+          return {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0
+          };
+        }
+        // 清空现有内容，为估算做准备
+        this.resetInner();
+        var orient = legendModel.get('orient');
+        var itemAlign = this.calculateItemAlign(legendModel, orient);
+        var selector = legendModel.get('selector', true);
+        var selectorPosition = this.calculateSelectorPosition(legendModel, orient, selector);
+        // 使用估算模式的内部渲染：创建透明元素用于布局计算
+        this.renderInnerForEstimate(itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition);
+        // 使用估算模式的布局计算
+        var layoutRect = this.layoutInnerForEstimate(legendModel, itemAlign, selector, selectorPosition, api);
+        // 估算背景尺寸
+        var backgroundRect = this.estimateBackgroundRect(layoutRect, legendModel);
+        return backgroundRect;
+      };
+      /**
+       * 估算模式的内部渲染：创建透明元素用于布局计算
+       * @protected
+       */
+      LegendView.prototype.renderInnerForEstimate = function (itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition) {
+        var contentGroup = this.getContentGroup();
+        var legendDrawnMap = createHashMap();
+        each$8(legendModel.getData(), function (legendItemModel, dataIndex) {
+          var name = legendItemModel.get('name');
+          // Use empty string or \n as a newline string
+          if (!this.newlineDisabled && (name === '' || name === '\n')) {
+            var g = new Group$1();
+            contentGroup.add(g);
+            return;
+          }
+          var seriesModel = ecModel.getSeriesByName(name)[0];
+          if (legendDrawnMap.get(name)) {
+            return;
+          }
+          if (seriesModel) {
+            // 创建透明的图例项用于尺寸估算
+            var itemGroup = this.createTransparentLegendItem(seriesModel, name, dataIndex, legendItemModel, legendModel, itemAlign);
+            contentGroup.add(itemGroup);
+            legendDrawnMap.set(name, true);
+          }
+        }, this);
+        if (selector) {
+          this.createTransparentSelector(selector, legendModel, orient, selectorPosition);
+        }
+      };
+      /**
+       * 创建透明的图例项用于尺寸估算
+       * @protected
+       */
+      LegendView.prototype.createTransparentLegendItem = function (seriesModel, name, dataIndex, legendItemModel, legendModel, itemAlign) {
+        var itemWidth = legendModel.get('itemWidth');
+        var itemHeight = legendModel.get('itemHeight');
+        var itemGroup = new Group();
+        // 创建透明的文本元素用于尺寸计算
+        var textStyleModel = legendItemModel.getModel('textStyle');
+        var textColor = legendModel.isSelected(name) ? textStyleModel.getTextColor() : legendItemModel.get('inactiveColor');
+        // 创建文本但设置为透明
+        var text = new ZRText({
+          style: createTextStyle(textStyleModel, {
+            text: name,
+            x: itemAlign === 'left' ? itemWidth + 5 : -5,
+            y: itemHeight / 2,
+            fill: 'transparent',
+            align: itemAlign,
+            verticalAlign: 'middle'
+          }, {
+            inheritColor: textColor
+          })
+        });
+        itemGroup.add(text);
+        // 创建透明的图标
+        var icon = createSymbol(legendItemModel.get('icon') || 'roundRect', itemAlign === 'left' ? 0 : -itemWidth, 0, itemWidth, itemHeight, 'transparent' // 设置为透明
+        );
+        itemGroup.add(icon);
+        return itemGroup;
+      };
+      /**
+       * 创建透明的选择器用于尺寸估算
+       * @protected
+       */
+      LegendView.prototype.createTransparentSelector = function (selector, legendModel, orient, selectorPosition) {
+        var selectorGroup = this.getSelectorGroup();
+        each$8(selector, function (selectorItem) {
+          var labelText = new ZRText({
+            style: {
+              x: 0,
+              y: 0,
+              align: 'center',
+              verticalAlign: 'middle',
+              fill: 'transparent' // 设置为透明
+            }
+          });
+          selectorGroup.add(labelText);
+          var labelModel = legendModel.getModel('selectorLabel');
+          setLabelStyle(labelText, {
+            normal: labelModel,
+            emphasis: labelModel
+          }, {
+            defaultText: selectorItem.title || selectorItem
+          });
+        });
+      };
+      /**
+       * 估算模式的布局计算
+       * @protected
+       */
+      LegendView.prototype.layoutInnerForEstimate = function (legendModel, itemAlign, selector, selectorPosition, api) {
+        var contentGroup = this.getContentGroup();
+        var selectorGroup = this.getSelectorGroup();
+        // 获取容器的可用空间
+        var refContainer = createBoxLayoutReference(legendModel, api).refContainer;
+        var positionInfo = legendModel.getBoxLayoutParams();
+        var padding = legendModel.get('padding');
+        var maxSize = getLayoutRect(positionInfo, refContainer, padding);
+        // 使用容器的实际尺寸进行布局
+        box(legendModel.get('orient'), contentGroup, legendModel.get('itemGap'), maxSize.width, maxSize.height);
+        var contentRect = contentGroup.getBoundingRect();
+        if (selector) {
+          // 对选择器进行布局
+          box('horizontal', selectorGroup, legendModel.get('selectorItemGap', true));
+          var selectorRect = selectorGroup.getBoundingRect();
+          return this.calculateLayoutRect(legendModel, contentRect, selectorRect, selectorPosition);
+        }
+        return contentRect;
+      };
+      /**
+       * 估算背景矩形
+       * @protected
+       */
+      LegendView.prototype.estimateBackgroundRect = function (mainRect, legendModel) {
+        var padding = normalizeCssArray$1(legendModel.get('padding') || 0);
+        return {
+          x: mainRect.x - padding[3],
+          y: mainRect.y - padding[0],
+          width: mainRect.width + padding[1] + padding[3],
+          height: mainRect.height + padding[0] + padding[2]
+        };
+      };
       LegendView.prototype.resetInner = function () {
         this.getContentGroup().removeAll();
         this._backgroundEl && this.group.remove(this._backgroundEl);
         this.getSelectorGroup().removeAll();
+      };
+      /**
+       * 计算图例项的对齐方式
+       * @protected
+       */
+      LegendView.prototype.calculateItemAlign = function (legendModel, orient) {
+        var itemAlign = legendModel.get('align');
+        if (!itemAlign || itemAlign === 'auto') {
+          itemAlign = legendModel.get('left') === 'right' && orient === 'vertical' ? 'right' : 'left';
+        }
+        return itemAlign;
+      };
+      /**
+       * 计算选择器位置
+       * @protected
+       */
+      LegendView.prototype.calculateSelectorPosition = function (legendModel, orient, selector) {
+        var selectorPosition = legendModel.get('selectorPosition', true);
+        if (selector && (!selectorPosition || selectorPosition === 'auto')) {
+          selectorPosition = orient === 'horizontal' ? 'end' : 'start';
+        }
+        return selectorPosition;
+      };
+      /**
+       * 计算布局矩形
+       * @protected
+       */
+      LegendView.prototype.calculateLayoutRect = function (legendModel, contentRect, selectorRect, selectorPosition, selectorPos) {
+        var selectorButtonGap = legendModel.get('selectorButtonGap', true);
+        var orientIdx = legendModel.getOrient().index;
+        var wh = orientIdx === 0 ? 'width' : 'height';
+        var hw = orientIdx === 0 ? 'height' : 'width';
+        var yx = orientIdx === 0 ? 'y' : 'x';
+        if (selectorRect && selectorPosition) {
+          var mainRect = {
+            x: 0,
+            y: 0
+          };
+          mainRect[wh] = contentRect[wh] + selectorButtonGap + selectorRect[wh];
+          mainRect[hw] = Math.max(contentRect[hw], selectorRect[hw]);
+          mainRect[yx] = selectorPos ? Math.min(0, selectorRect[yx] + selectorPos[1 - orientIdx]) : Math.min(0, selectorRect[yx]);
+          return mainRect;
+        }
+        return contentRect;
       };
       LegendView.prototype.renderInner = function (itemAlign, legendModel, ecModel, api, selector, orient, selectorPosition) {
         var contentGroup = this.getContentGroup();
@@ -56607,7 +58579,7 @@
         ecModel.eachRawSeries(function (seriesModel) {
           !seriesModel.get('legendHoverLink') && excludeSeriesId.push(seriesModel.id);
         });
-        each$7(legendModel.getData(), function (legendItemModel, dataIndex) {
+        each$8(legendModel.getData(), function (legendItemModel, dataIndex) {
           var _this = this;
           var name = legendItemModel.get('name');
           // Use empty string or \n as a newline string
@@ -56721,7 +58693,7 @@
       };
       LegendView.prototype._createSelector = function (selector, legendModel, api, orient, selectorPosition) {
         var selectorGroup = this.getSelectorGroup();
-        each$7(selector, function createSelectorButton(selectorItem) {
+        each$8(selector, function createSelectorButton(selectorItem) {
           var type = selectorItem.type;
           var labelText = new ZRText({
             style: {
@@ -56855,7 +58827,6 @@
           var orientIdx = legendModel.getOrient().index;
           var wh = orientIdx === 0 ? 'width' : 'height';
           var hw = orientIdx === 0 ? 'height' : 'width';
-          var yx = orientIdx === 0 ? 'y' : 'x';
           if (selectorPosition === 'end') {
             selectorPos[orientIdx] += contentRect[wh] + selectorButtonGap;
           } else {
@@ -56867,14 +58838,7 @@
           selectorGroup.y = selectorPos[1];
           contentGroup.x = contentPos[0];
           contentGroup.y = contentPos[1];
-          var mainRect = {
-            x: 0,
-            y: 0
-          };
-          mainRect[wh] = contentRect[wh] + selectorButtonGap + selectorRect[wh];
-          mainRect[hw] = Math.max(contentRect[hw], selectorRect[hw]);
-          mainRect[yx] = Math.min(0, selectorRect[yx] + selectorPos[1 - orientIdx]);
-          return mainRect;
+          return this.calculateLayoutRect(legendModel, contentRect, selectorRect, selectorPosition, selectorPos);
         } else {
           contentGroup.x = contentPos[0];
           contentGroup.y = contentPos[1];
@@ -56901,7 +58865,7 @@
         if (style.lineWidth === 'auto') {
           style.lineWidth = visualStyle.lineWidth > 0 ? 2 : 0;
         }
-        each$7(style, function (propVal, propName) {
+        each$8(style, function (propVal, propName) {
           style[propName] === 'inherit' && (style[propName] = visualStyle[propName]);
         });
       }
@@ -57330,6 +59294,73 @@
           selectorGroup.x = selectorPos[0];
           selectorGroup.y = selectorPos[1];
           selectorGroup.markRedraw();
+        }
+        return mainRect;
+      };
+      /**
+       * @override
+       */
+      ScrollableLegendView.prototype.layoutInnerForEstimate = function (legendModel, itemAlign, selector, selectorPosition, api) {
+        // Cast to ScrollableLegendModel since this is ScrollableLegendView
+        var scrollableModel = legendModel;
+        var selectorGroup = this.getSelectorGroup();
+        var orientIdx = scrollableModel.getOrient().index;
+        var wh = WH$2[orientIdx];
+        var xy = XY$2[orientIdx];
+        var hw = WH$2[1 - orientIdx];
+        var yx = XY$2[1 - orientIdx];
+        var selectorArr = selector;
+        selectorArr && box(
+        // Buttons in selectorGroup always layout horizontally
+        'horizontal', selectorGroup, scrollableModel.get('selectorItemGap', true));
+        var selectorButtonGap = scrollableModel.get('selectorButtonGap', true);
+        var selectorRect = selectorGroup.getBoundingRect();
+        // Get layout information similar to render method
+        var refContainer = createBoxLayoutReference(scrollableModel, api).refContainer;
+        var positionInfo = scrollableModel.getBoxLayoutParams();
+        var padding = scrollableModel.get('padding');
+        var maxSize = getLayoutRect(positionInfo, refContainer, padding);
+        var processMaxSize = clone(maxSize);
+        selectorArr && (processMaxSize[wh] = maxSize[wh] - selectorRect[wh] - selectorButtonGap);
+        var mainRect = this._layoutContentAndControllerForEstimate(scrollableModel, false, processMaxSize, orientIdx, wh, hw, yx, xy);
+        if (selectorArr) {
+          mainRect[wh] += selectorRect[wh] + selectorButtonGap;
+          mainRect[hw] = Math.max(mainRect[hw], selectorRect[hw]);
+        }
+        return mainRect;
+      };
+      ScrollableLegendView.prototype._layoutContentAndControllerForEstimate = function (legendModel, isFirstRender, maxSize, orientIdx, wh, hw, yx, xy) {
+        var contentGroup = this.getContentGroup();
+        var controllerGroup = this._controllerGroup;
+        // Place items in contentGroup.
+        box(legendModel.get('orient'), contentGroup, legendModel.get('itemGap'), !orientIdx ? null : maxSize.width, orientIdx ? null : maxSize.height);
+        box(
+        // Buttons in controller are layout always horizontally.
+        'horizontal', controllerGroup, legendModel.get('pageButtonItemGap', true));
+        var contentRect = contentGroup.getBoundingRect();
+        var controllerRect = controllerGroup.getBoundingRect();
+        var showController = contentRect[wh] > maxSize[wh];
+        // Calculate `mainRect` for estimation.
+        // mainRect should not be calculated by `this.group.getBoundingRect()`
+        // for sake of the overflow.
+        var mainRect = {
+          x: 0,
+          y: 0
+        };
+        // Consider content may be overflow (should be clipped).
+        mainRect[wh] = showController ? maxSize[wh] : contentRect[wh];
+        mainRect[hw] = Math.max(contentRect[hw], controllerRect[hw]);
+        // Consider controller position.
+        if (showController) {
+          var pageButtonPosition = legendModel.get('pageButtonPosition', true);
+          var pageButtonGap = retrieve2(legendModel.get('pageButtonGap', true), legendModel.get('itemGap', true));
+          if (pageButtonPosition === 'end') {
+            mainRect[yx] = Math.min(mainRect[yx], -controllerRect[wh]);
+          } else {
+            mainRect[yx] = Math.min(mainRect[yx], controllerRect[wh] + pageButtonGap);
+          }
+        } else {
+          mainRect[yx] = Math.min(0, controllerRect[yx]);
         }
         return mainRect;
       };
@@ -58607,8 +60638,10 @@
         });
         // Position barGroup
         var rect = thisGroup.getBoundingRect([sliderGroup]);
-        thisGroup.x = location.x - rect.x;
-        thisGroup.y = location.y - rect.y;
+        var rectX = isNaN(rect.x) ? 0 : rect.x;
+        var rectY = isNaN(rect.y) ? 0 : rect.y;
+        thisGroup.x = location.x - rectX;
+        thisGroup.y = location.y - rectY;
         thisGroup.markRedraw();
       };
       SliderZoomView.prototype._getViewExtent = function () {

@@ -27,13 +27,21 @@ import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
 import { Payload, ColorString } from '../../util/types';
 import SeriesData from '../../data/SeriesData';
-import PieSeriesModel, {PieDataItemOption} from './PieSeries';
+import PieSeriesModel, { PieDataItemOption } from './PieSeries';
 import labelLayout from './labelLayout';
 import { setLabelLineStyle, getLabelLineStatesModels } from '../../label/labelGuideHelper';
 import { setLabelStyle, getLabelStatesModels } from '../../label/labelStyle';
 import { getSectorCornerRadius } from '../helper/sectorHelper';
 import { saveOldStyle } from '../../animation/basicTransition';
-import { getSeriesLayoutData } from './pieLayout';
+import { getSeriesLayoutData, pieSingleLayout } from './pieLayout';
+import {
+    LegendAvoidableSeriesView,
+    LayoutLegendContext,
+    calculateOuterBoundingRectWithLabels,
+    calculateCircularBoundingRect
+} from '../../util/autoLayout';
+import { BoundingRect } from 'zrender';
+import { getCircleLayout } from '../../util/layout';
 
 
 /**
@@ -84,7 +92,7 @@ class PiePiece extends graphic.Sector {
                 graphic.initProps(sector, {
                     scaleX: 0,
                     scaleY: 0
-                }, seriesModel, { dataIndex: idx, isFrom: true});
+                }, seriesModel, { dataIndex: idx, isFrom: true });
                 sector.originX = sectorShape.cx;
                 sector.originY = sectorShape.cy;
             }
@@ -228,7 +236,9 @@ class PiePiece extends graphic.Sector {
 
 
 // Pie view
-class PieView extends ChartView {
+class PieView extends ChartView implements LegendAvoidableSeriesView {
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext;
 
     static type = 'pie';
 
@@ -239,6 +249,12 @@ class PieView extends ChartView {
 
     render(seriesModel: PieSeriesModel, ecModel: GlobalModel, api: ExtensionAPI, payload: Payload): void {
         const data = seriesModel.getData();
+
+        const margin = this.autoLayoutContext?.margin;
+        if (margin != null) {
+            // 使用布局函数应用margin压缩
+            pieSingleLayout(seriesModel, api, margin);
+        }
 
         const oldData = this._data;
         const group = this.group;
@@ -300,6 +316,57 @@ class PieView extends ChartView {
         if (seriesModel.get('animationTypeUpdate') !== 'expansion') {
             this._data = data;
         }
+    }
+
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: PieSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: Payload
+    ): BoundingRect {
+        const data = seriesModel.getData();
+        // 为了正确计算饼图每个扇区的标签布局，需要在当前图形上下文中临时创建一组扇区 PiePiece 实例。
+        // 这样各个标签布局才能在真实位置下准确计算，避免与真实渲染流程发生干扰。
+        const tempGroup = new graphic.Group();
+        // 临时 group 必须挂载到饼图主 group 下，否则部分依赖上下文的布局（如 label 旋转等）会不准确。
+        this.group.add(tempGroup);
+
+        const tempPiePieces: PiePiece[] = [];
+        data.each(function (idx) {
+            const layout = data.getItemLayout(idx);
+            // 过滤掉未分配布局的项（如被筛选的数据），只创建有效扇区
+            if (layout && !isNaN(layout.startAngle)) {
+                // 这里传入的 startAngle 无实际用处，标签布局仅关心 piePiece 元素的挂载和注册
+                const piePiece = new PiePiece(data, idx, null as any);
+                // 挂载到临时 group，保证上下文正确
+                tempGroup.add(piePiece);
+                // 必须注册到数据对象，标签布局算法内部依赖此注册取到 labelGroup
+                data.setItemGraphicEl(idx, piePiece);
+                tempPiePieces.push(piePiece);
+            }
+        });
+
+        // 此时所有 piePiece 均已临时就位，可以开始执行标签排布算法，得到标签的最终布局信息
+        const labelLayoutList = labelLayout(seriesModel);
+
+        // 标签布局已完成，务必清理现场，移除所有临时扇区，防止影响后续正常渲染
+        tempPiePieces.forEach(piePiece => {
+            tempGroup.remove(piePiece);
+        });
+        this.group.remove(tempGroup);
+
+        // 同时清除数据上暂存的每项图形引用，确保不影响真实渲染流程
+        data.each(function (idx) {
+            data.setItemGraphicEl(idx, null);
+        });
+
+        // 获取当前饼图的主体圆形布局信息
+        const { cx, cy, r } = getCircleLayout(seriesModel, api);
+        const sectorRect = calculateCircularBoundingRect(cx, cy, r);
+
+        // 综合主圆和所有标签外框，合成完整的外包围盒，便于图例避让等全局布局优化
+        return calculateOuterBoundingRectWithLabels(sectorRect, labelLayoutList);
     }
 
     dispose() {}

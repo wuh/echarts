@@ -23,7 +23,9 @@ import {AxisModelCommonMixin} from '../axisModelCommonMixin';
 import Single from './Single';
 import SingleAxis from './SingleAxis';
 import { AxisBaseOption } from '../axisCommonTypes';
-import { BoxLayoutOptionMixin, LayoutOrient } from '../../util/types';
+import {
+    BoxLayoutOptionMixin, ComponentOnCalendarOptionMixin, ComponentOnMatrixOptionMixin, LayoutOrient
+} from '../../util/types';
 import { AxisBaseModel } from '../AxisBaseModel';
 import { mixin } from 'zrender/src/core/util';
 
@@ -33,7 +35,13 @@ export type SingleAxisOption = AxisBaseOption & BoxLayoutOptionMixin & {
     mainType?: 'singleAxis'
     position?: SingleAxisPosition
     orient?: LayoutOrient
-};
+    /**
+     * 自适应布局。
+     *
+     * 配置该参数后，会自动处理轴标签和轴名称的溢出，自动压缩坐标系。
+     */
+    adaptiveLayout?: boolean
+} & ComponentOnCalendarOptionMixin & ComponentOnMatrixOptionMixin;
 
 class SingleAxisModel extends ComponentModel<SingleAxisOption>
     implements AxisBaseModel<SingleAxisOption> {
@@ -102,6 +110,8 @@ class SingleAxisModel extends ComponentModel<SingleAxisOption>
         jitter: 0,
         jitterOverlap: true,
         jitterMargin: 2,
+        // 自适应布局
+        adaptiveLayout: false,
     };
 }
 

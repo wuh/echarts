@@ -72,6 +72,8 @@ type AxisInnerStore = {
     axisTick: AxisCache<AxisCategoryTickLabelCacheKey<'axisTick'>, AxisCategoryTickCreated>
     axisLabel: AxisCache<AxisCategoryTickLabelCacheKey<'axisLabel'>, AxisCategoryLabelCreated>
     autoInterval: number
+    autoRotateAngle?: number
+    wrapWidth?: number
 };
 const axisInner = makeInner<AxisInnerStore, Axis>();
 
@@ -132,8 +134,10 @@ export function createAxisLabels(axis: Axis, ctx: AxisLabelsComputingContext): {
         return {
             labels: zrUtil.map(ticks, numval => {
                 const tick = {value: numval};
+                const index = ticks.indexOf(numval);
+
                 return {
-                    formattedLabel: labelFormatter(tick),
+                    formattedLabel: labelFormatter(tick, index),
                     rawLabel: axis.scale.getLabel(tick),
                     tickValue: numval,
                     time: undefined as ScaleTick['time'] | NullUndefined,
@@ -347,7 +351,51 @@ function makeAutoCategoryInterval(axis: Axis, ctx: AxisLabelsComputingContext): 
 export function calculateCategoryInterval(axis: Axis, ctx: AxisLabelsComputingContext) {
     const kind = ctx.kind;
 
-    const params = fetchAutoCategoryIntervalCalculationParams(axis);
+    // 检查布局模式配置
+    const labelModel = axis.getLabelModel();
+    const layoutMode = labelModel.get('layoutMode');
+    let interval: number;
+
+    if (layoutMode === 'rotate') {
+        // 旋转模式：计算最佳旋转角度和间隔值
+        const result = calculateAutoRotateAngle(axis);
+        axisInner(axis).autoRotateAngle = result.angle;
+        interval = result.interval;
+    }
+    else if (layoutMode === 'wrap') {
+        // 换行模式：计算换行后的间隔值
+        const result = calculateWrapInterval(axis);
+        axisInner(axis).wrapWidth = result.wrapWidth;
+        interval = result.interval;
+    }
+    else {
+        // 默认模式：使用指定角度计算间隔
+        interval = calculateIntervalForAngle(axis);
+    }
+
+    const ordinalScale = axis.scale as OrdinalScale;
+    const tickCount = ordinalScale.count();
+
+    if (kind === AxisTickLabelComputingKind.estimate) {
+        // In estimate kind, the inteval likely varies, thus do not erase the cache.
+        ctx.out.noPxChangeTryDetermine.push(
+            zrUtil.bind(calculateCategoryIntervalTryDetermine, null, axis, interval, tickCount)
+        );
+        return interval;
+    }
+
+    const lastInterval = calculateCategoryIntervalDealCache(axis, interval, tickCount);
+    return lastInterval != null ? lastInterval : interval;
+}
+
+/**
+ * 计算指定角度下的间隔值。
+ */
+function calculateIntervalForAngle(
+    axis: Axis,
+    angle?: number
+): number {
+    const params = fetchAutoCategoryIntervalCalculationParams(axis, angle);
     const labelFormatter = makeLabelFormatter(axis);
     const rotation = (params.axisRotate - params.labelRotate) / 180 * Math.PI;
 
@@ -403,22 +451,70 @@ export function calculateCategoryInterval(axis: Axis, ctx: AxisLabelsComputingCo
     isNaN(dh) && (dh = Infinity);
     const interval = Math.max(0, Math.floor(Math.min(dw, dh)));
 
-    if (kind === AxisTickLabelComputingKind.estimate) {
-        // In estimate kind, the inteval likely varies, thus do not erase the cache.
-        ctx.out.noPxChangeTryDetermine.push(
-            zrUtil.bind(calculateCategoryIntervalTryDetermine, null, axis, interval, tickCount)
-        );
-        return interval;
-    }
-
-    const lastInterval = calculateCategoryIntervalDealCache(axis, interval, tickCount);
-    return lastInterval != null ? lastInterval : interval;
+    return interval;
 }
 
 function calculateCategoryIntervalTryDetermine(
     axis: Axis, interval: number, tickCount: number
 ): boolean {
     return calculateCategoryIntervalDealCache(axis, interval, tickCount) == null;
+}
+
+/**
+ * 计算轴标签的自动旋转角度。
+ *
+ * 按顺序尝试角度：0°、45°、-90°，返回第一个使 interval = 0 的角度和对应的间隔值，
+ * 如果都不行则返回 -90° 和对应的间隔值。
+ */
+function calculateAutoRotateAngle(axis: Axis): { angle: number, interval: number } {
+    // 按顺序尝试角度：0°、45°、90°
+    const anglesToTry = [0, 45, 90];
+
+    for (let i = 0; i < anglesToTry.length; i++) {
+        const angle = anglesToTry[i];
+        // 使用提取的函数计算间隔
+        const interval = calculateIntervalForAngle(axis, angle);
+
+        // 如果间隔为0，表示所有标签都能放下，使用此角度
+        if (interval === 0) {
+            return { angle, interval };
+        }
+    }
+
+    // 如果所有角度都不行，使用 90 度作为后备方案，并计算其间隔
+    const fallbackAngle = 90;
+    const fallbackInterval = calculateIntervalForAngle(axis, fallbackAngle);
+    return { angle: fallbackAngle, interval: fallbackInterval };
+}
+
+/**
+ * 计算换行模式下的间隔值。
+ *
+ * 换行模式下，interval 总是返回 0（显示所有标签），wrapWidth 设置为单位宽度。对
+ * 于 x 轴（水平），使用 unitW；对于 y 轴（垂直），使用 unitH。让标签文本根据可
+ * 用宽度自动换行。
+ */
+function calculateWrapInterval(axis: Axis): { interval: number, wrapWidth: number } {
+    const params = fetchAutoCategoryIntervalCalculationParams(axis);
+    const rotation = (params.axisRotate - params.labelRotate) / 180 * Math.PI;
+
+    const ordinalScale = axis.scale as OrdinalScale;
+    const ordinalExtent = ordinalScale.getExtent();
+
+    if (ordinalExtent[1] - ordinalExtent[0] < 1) {
+        return { interval: 0, wrapWidth: Infinity };
+    }
+
+    const tickValue = ordinalExtent[0];
+    const unitSpan = axis.dataToCoord(tickValue + 1) - axis.dataToCoord(tickValue);
+    const unitW = Math.abs(unitSpan * Math.cos(rotation));
+    const unitH = Math.abs(unitSpan * Math.sin(rotation));
+
+    // 对于 x 轴（水平），unitW 有效；对于 y 轴（垂直），unitH 有效
+    // 使用 max 来确保无论轴的方向如何都能获取正确的单位宽度
+    const wrapWidth = Math.max(unitW, unitH);
+
+    return { interval: 0, wrapWidth: wrapWidth };
 }
 
 // Return the lastInterval if need to use it, otherwise return NullUndefined and save cache.
@@ -459,7 +555,7 @@ function calculateCategoryIntervalDealCache(
     }
 }
 
-function fetchAutoCategoryIntervalCalculationParams(axis: Axis) {
+function fetchAutoCategoryIntervalCalculationParams(axis: Axis, overrideRotate?: number) {
     const labelModel = axis.getLabelModel();
     return {
         axisRotate: axis.getRotate
@@ -467,7 +563,7 @@ function fetchAutoCategoryIntervalCalculationParams(axis: Axis) {
             : ((axis as Axis2D).isHorizontal && !(axis as Axis2D).isHorizontal())
             ? 90
             : 0,
-        labelRotate: labelModel.get('rotate') || 0,
+        labelRotate: overrideRotate !== undefined ? overrideRotate : (labelModel.get('rotate') || 0),
         font: labelModel.getFont()
     };
 }
@@ -584,3 +680,5 @@ function makeLabelsByCustomizedCategoryInterval(
 
     return result;
 }
+
+export { axisInner };

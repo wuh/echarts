@@ -70,9 +70,10 @@ import BoundingRect from 'zrender/src/core/BoundingRect';
 import Point from 'zrender/src/core/Point';
 import { copyTransform } from 'zrender/src/core/Transformable';
 import {
-    AxisLabelsComputingContext, AxisTickLabelComputingKind, createAxisLabelsComputingContext
+    AxisLabelsComputingContext, AxisTickLabelComputingKind, createAxisLabelsComputingContext, axisInner
 } from '../../coord/axisTickLabelBuilder';
 import { AxisTickCoord } from '../../coord/Axis';
+import { TextStyleProps } from 'zrender/src/graphic/Text';
 
 
 const PI = Math.PI;
@@ -1341,10 +1342,18 @@ function buildAxisLabel(
     const labelModel = axisModel.getModel('axisLabel');
     const labels = axis.getViewLabels(axisLabelCreationCtx);
 
-    // Special label rotate.
+    // Special label rotate and wrap mode.
+    const layoutMode = labelModel.get('layoutMode');
     const labelRotation = (
-        retrieve(cfg.raw.labelRotate, labelModel.get('rotate')) || 0
+        retrieve(
+            layoutMode === 'rotate' ? axisInner(axis).autoRotateAngle : null,
+            cfg.raw.labelRotate,
+            labelModel.get('rotate')
+        ) || 0
     ) * PI / 180;
+
+    // 获取换行模式的相关信息
+    const wrapWidth = layoutMode === 'wrap' ? axisInner(axis).wrapWidth : undefined;
 
     const labelLayout = AxisBuilder.innerTextLayout(cfg.rotation, labelRotation, cfg.labelDirection);
     const rawCategoryData = axisModel.getCategories && axisModel.getCategories(true);
@@ -1400,6 +1409,13 @@ function buildAxisLabel(
         z2Min = Math.min(z2Min, z2);
         z2Max = Math.max(z2Max, z2);
 
+        // 准备换行模式的样式属性
+        const wrapStyle: TextStyleProps = {};
+        if (layoutMode === 'wrap' && wrapWidth != null) {
+            wrapStyle.width = wrapWidth;
+            wrapStyle.overflow = 'break';
+        }
+
         const textEl = new graphic.Text({
             // --- transform props start ---
             // All of the transform props MUST not be set here, but should be set in
@@ -1437,6 +1453,7 @@ function buildAxisLabel(
                         index
                     )
                     : textColor as string,
+                ...wrapStyle
             })
         });
 

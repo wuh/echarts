@@ -26,8 +26,11 @@ import type {
     AngleAxisOption as AngleAxisComponentOption
 } from '../coord/polar/AxisModel';
 import type {
+    // Historical typo, deprecated but still exported for compatibility.
     XAXisOption as XAXisComponentOption,
-    YAXisOption as YAXisComponentOption
+    YAXisOption as YAXisComponentOption,
+    XAXisOption as XAxisComponentOption,
+    YAXisOption as YAxisComponentOption,
 } from '../coord/cartesian/AxisModel';
 import type {SingleAxisOption as SingleAxisComponentOption} from '../coord/single/AxisModel';
 import type {ParallelAxisOption as ParallelAxisComponentOption} from '../coord/parallel/AxisModel';
@@ -60,6 +63,9 @@ import type {
 import type {
     PiecewiseVisualMapOption as PiecewiseVisualMapComponentOption
 } from '../component/visualMap/PiecewiseModel';
+import type {
+    ScrollablePiecewiseVisualMapOption as ScrollPiecewiseVisualMapComponentOption
+} from '../component/visualMap/ScrollablePiecewiseModel';
 
 import type {MarkLineOption as MarkLineComponentOption} from '../component/marker/MarkLineModel';
 import type {MarkPointOption as MarkPointComponentOption} from '../component/marker/MarkPointModel';
@@ -142,8 +148,10 @@ interface ToolboxComponentOption extends ToolboxOption {
 
 export { SliderDataZoomComponentOption, InsideDataZoomComponentOption };
 export type DataZoomComponentOption = SliderDataZoomComponentOption | InsideDataZoomComponentOption;
-export { ContinousVisualMapComponentOption, PiecewiseVisualMapComponentOption };
-export type VisualMapComponentOption = ContinousVisualMapComponentOption | PiecewiseVisualMapComponentOption;
+export { ContinousVisualMapComponentOption, PiecewiseVisualMapComponentOption, ScrollPiecewiseVisualMapComponentOption};
+export type VisualMapComponentOption = ContinousVisualMapComponentOption
+| PiecewiseVisualMapComponentOption
+| ScrollPiecewiseVisualMapComponentOption;
 export { PlainLegendComponentOption, ScrollableLegendComponentOption };
 export type LegendComponentOption = PlainLegendComponentOption | ScrollableLegendComponentOption;
 export {
@@ -153,6 +161,8 @@ export {
     GeoComponentOption,
     XAXisComponentOption,
     YAXisComponentOption,
+    XAxisComponentOption,
+    YAxisComponentOption,
     SingleAxisComponentOption,
     RadiusAxisComponentOption,
     AngleAxisComponentOption,

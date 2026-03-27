@@ -28,6 +28,15 @@ import { ColorString } from '../../util/types';
 import { setLabelLineStyle, getLabelLineStatesModels } from '../../label/labelGuideHelper';
 import { setLabelStyle, getLabelStatesModels } from '../../label/labelStyle';
 import { saveOldStyle } from '../../animation/basicTransition';
+import {
+    LegendAvoidableSeriesView,
+    LayoutLegendContext,
+    calculateOuterBoundingRectWithLabels,
+    calculateLabelBoundingRect
+} from '../../util/autoLayout';
+import BoundingRect from 'zrender/lib/core/BoundingRect';
+import { applyFunnelLayout } from './funnelLayout';
+import { createBoxLayoutReference, getLayoutRect } from '../../util/layout';
 
 const opacityAccessPath = ['itemStyle', 'opacity'] as const;
 
@@ -174,17 +183,27 @@ class FunnelPiece extends graphic.Polygon {
     }
 }
 
-class FunnelView extends ChartView {
+class FunnelView extends ChartView implements LegendAvoidableSeriesView {
     static type = 'funnel' as const;
     type = FunnelView.type;
 
     private _data: SeriesData;
 
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext | undefined;
+
     ignoreLabelLineUpdate = true;
 
-    render(seriesModel: FunnelSeriesModel, ecModel: GlobalModel, api: ExtensionAPI) {
+    render(seriesModel: FunnelSeriesModel, ecModel: GlobalModel, api: ExtensionAPI, payload?: any) {
         const data = seriesModel.getData();
         const oldData = this._data;
+
+        // 处理自动布局上下文中的边距压缩
+        const margin = this.autoLayoutContext?.margin;
+        if (margin != null) {
+            // 使用布局函数应用margin压缩
+            applyFunnelLayout(seriesModel, api, margin);
+        }
 
         const group = this.group;
 
@@ -216,6 +235,63 @@ class FunnelView extends ChartView {
     remove() {
         this.group.removeAll();
         this._data = null;
+    }
+
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: FunnelSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: any
+    ): BoundingRect {
+        const layoutRef = createBoxLayoutReference(seriesModel, api);
+        const viewRect = getLayoutRect(seriesModel.getBoxLayoutParams(), layoutRef.refContainer);
+
+        // 收集标签布局信息
+        const data = seriesModel.getData();
+        const labelLayouts: Array<{ rect: BoundingRect; textAlign?: string }> = [];
+
+        data.each(function (idx) {
+            const layout = data.getItemLayout(idx);
+            if (!layout || !layout.label) {
+                return;
+            }
+
+            const labelLayout = layout.label;
+            // 只处理非内部标签，内部标签不扩大外边界
+            if (labelLayout.inside) {
+                return;
+            }
+
+            const itemModel = data.getItemModel<FunnelDataItemOption>(idx);
+
+            // 获取标签文本（可能需要格式化）
+            let labelText = seriesModel.getFormattedLabel(idx, 'normal');
+            if (labelText == null) {
+                labelText = data.getName(idx);
+            }
+
+            // 使用公共函数计算标签的全局边界矩形
+            const labelRect = calculateLabelBoundingRect({
+                align: labelLayout.textAlign,
+                verticalAlign: labelLayout.verticalAlign,
+                text: labelText || '',
+                x: labelLayout.x,
+                y: labelLayout.y,
+                rotation: labelLayout.rotation || 0,
+                originX: labelLayout.x,
+                originY: labelLayout.y
+            }, itemModel);
+
+            if (labelRect) {
+                labelLayouts.push({
+                    rect: labelRect,
+                    textAlign: labelLayout.textAlign
+                });
+            }
+        });
+
+        return calculateOuterBoundingRectWithLabels(viewRect, labelLayouts);
     }
 
     dispose() {}

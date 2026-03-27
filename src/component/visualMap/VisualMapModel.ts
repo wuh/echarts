@@ -33,7 +33,9 @@ import {
     OptionDataValue,
     BuiltinVisualProperty,
     DimensionIndex,
-    OptionId
+    ComponentOnCalendarOptionMixin,
+    ComponentOnMatrixOptionMixin,
+    PositionSizeOption
 } from '../../util/types';
 import ComponentModel from '../../model/Component';
 import Model from '../../model/Model';
@@ -41,6 +43,11 @@ import GlobalModel from '../../model/Global';
 import SeriesModel from '../../model/Series';
 import SeriesData from '../../data/SeriesData';
 import tokens from '../../visual/tokens';
+import {
+    AutoLayoutComponentModel,
+    AutoLayoutLegendOption,
+    preprocessLegendAutoLayoutOption
+} from '../../util/autoLayout';
 
 const mapVisual = VisualMapping.mapVisual;
 const eachVisual = VisualMapping.eachVisual;
@@ -56,8 +63,11 @@ type LabelFormatter = (min: OptionDataValue, max?: OptionDataValue) => string;
 type VisualState = VisualMapModel['stateList'][number];
 export interface VisualMapOption<T extends VisualOptionBase = VisualOptionBase> extends
     ComponentOption,
+    ComponentOnCalendarOptionMixin,
+    ComponentOnMatrixOptionMixin,
     BoxLayoutOptionMixin,
-    BorderOptionMixin {
+    BorderOptionMixin,
+    AutoLayoutLegendOption {
 
     mainType?: 'visualMap'
 
@@ -70,8 +80,8 @@ export interface VisualMapOption<T extends VisualOptionBase = VisualOptionBase> 
      * 'all' or null/undefined: all series.
      * A number or an array of number: the specified series.
      */
-    seriesIndex?: 'all' | number[] | number
-    seriesId?: OptionId | OptionId[]
+    seriesIndex?: modelUtil.ModelFinderIndexQuery
+    seriesId?: modelUtil.ModelFinderIdQuery
 
     /**
      * set min: 0, max: 200, only for campatible with ec2.
@@ -162,7 +172,8 @@ export interface VisualMeta {
     dimension?: DimensionIndex
 }
 
-class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends ComponentModel<Opts> {
+class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends ComponentModel<Opts>
+    implements AutoLayoutComponentModel {
 
     static type = 'visualMap';
     type = VisualMapModel.type;
@@ -194,7 +205,10 @@ class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends Com
 
     itemSize: number[];
 
+    private _autoLayoutBoxParams?: BoxLayoutOptionMixin;
+
     init(option: Opts, parentModel: Model, ecModel: GlobalModel) {
+        preprocessLegendAutoLayoutOption(this.option);
         this.mergeDefaultAndTheme(option, ecModel);
     }
 
@@ -423,6 +437,32 @@ class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends Com
         return this._dataExtent.slice() as [number, number];
     }
 
+    /** @implements AutoLayoutComponentModel */
+    setAutoLayoutBoxParams(params: BoxLayoutOptionMixin) {
+        this._autoLayoutBoxParams = params;
+    }
+
+    getBoxLayoutParams(): {
+        left: PositionSizeOption;
+        top: PositionSizeOption;
+        right: PositionSizeOption;
+        bottom: PositionSizeOption;
+        width: PositionSizeOption;
+        height: PositionSizeOption;
+    } {
+        if (this._autoLayoutBoxParams) {
+            return this._autoLayoutBoxParams as {
+                left: PositionSizeOption;
+                top: PositionSizeOption;
+                right: PositionSizeOption;
+                bottom: PositionSizeOption;
+                width: PositionSizeOption;
+                height: PositionSizeOption;
+            };
+        }
+        return super.getBoxLayoutParams();
+    }
+
     completeVisualOption() {
 
         const ecModel = this.ecModel;
@@ -642,6 +682,13 @@ class VisualMapModel<Opts extends VisualMapOption = VisualMapOption> extends Com
 
         textStyle: {
             color: tokens.color.secondary          // 值域文字颜色
+        },
+        // 自动布局默认配置
+        autoLayout: {
+            enable: false,
+            position: 'bottom',
+            align: 'center',
+            layoutMode: 'multiLine'
         }
     };
 }

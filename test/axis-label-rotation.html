@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<!--
+  坐标轴标签旋转角度测试页
+  - 场景覆盖: x轴标签旋转、y轴标签旋转、不同角度对比
+  - 交互控件：x轴旋转角度、y轴旋转角度
+-->
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="lib/simpleRequire.js"></script>
+  <script src="lib/config.js"></script>
+  <script src="lib/jquery.min.js"></script>
+  <script src="lib/testHelper.js"></script>
+  <link rel="stylesheet" href="lib/reset.css" />
+  <style>
+    h2 {
+      margin: 12px 0 4px;
+      font-size: 14px;
+    }
+
+    .test-chart-block {
+      border-bottom: 1px solid black;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="axis-label-auto-rotate"></div>
+  <div id="axis-label-auto-rotate-provinces"></div>
+
+  <script>
+    require(['echarts'], function (echarts) {
+
+      // 辅助函数：从控件状态中获取实际值
+      function getValueFromControlState(controlState, controlDefine) {
+        if (!controlState || typeof controlState.optionIndex !== 'number') {
+          return controlDefine.value; // 返回默认值
+        }
+        var optionIndex = controlState.optionIndex;
+        if (controlDefine.values) {
+          return controlDefine.values[optionIndex];
+        } else if (controlDefine.options) {
+          return controlDefine.options[optionIndex].value;
+        }
+        return controlDefine.value; // 返回默认值
+      }
+
+      // 辅助函数：获取控件定义
+      function getControlDefinition(paramName) {
+        var controlDefinitions = {
+          'language': {
+            values: ['zh', 'en'],
+            value: 'zh'
+          },
+          'layoutMode': {
+            values: ['rotate', 'wrap'],
+            value: 'rotate'
+          },
+          'dataCount': {
+            values: [7, 31, 61],
+            value: 7
+          },
+          'provinceCount': {
+            values: [10, 20, 34],
+            value: 10
+          }
+        };
+        return controlDefinitions[paramName] || null;
+      }
+
+      // 通用onchange处理函数
+      function handleOptionChange(chart, optionGenerator, paramNames) {
+        var state = chart.__testHelper.getInputsState();
+        var params = [];
+
+        // 处理参数映射
+        for (var i = 0; i < paramNames.length; i++) {
+          var paramName = paramNames[i];
+          var controlState = state[paramName];
+
+          if (controlState && controlState.value !== undefined) {
+            // range控件：直接使用value
+            params.push(controlState.value);
+          } else if (controlState && controlState.optionIndex !== undefined) {
+            // select控件：使用optionIndex获取值
+            var controlDef = getControlDefinition(paramName);
+            if (controlDef) {
+              params.push(getValueFromControlState(controlState, controlDef));
+            }
+            else {
+              // 默认情况
+              params.push(controlState.optionIndex);
+            }
+          } else {
+            // 默认值
+            params.push(null);
+          }
+        }
+
+        var opt = optionGenerator.apply(null, params);
+        chart.setOption(opt, true);
+      }
+
+      var chart0Names = ['xAxisRotate', 'yAxisRotate', 'language'];
+
+      // 辅助函数：生成2025年10月的日期标签
+      function generate2025OctoberDates(language) {
+        var dates = [];
+        var startDate = new Date(2025, 9, 1); // 2025年10月1日 (月份从0开始，所以9代表10月)
+        var endDate = new Date(2025, 9, 31); // 2025年10月31日
+
+        for (var d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+          var year = d.getFullYear();
+          var month = d.getMonth() + 1;
+          var day = d.getDate();
+
+          if (language === 'zh') {
+            // 中文格式：2025年10月1日
+            dates.push(year + '年' + month + '月' + day + '日');
+          } else {
+            // 英文格式：Oct 1, 2025
+            var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var monthName = monthNames[month - 1];
+            dates.push(monthName + ' ' + day + ', ' + year);
+          }
+        }
+        return dates;
+      }
+
+      // 辅助函数：生成指定时间范围的日期标签
+      function generateDateLabels(startYear, startMonth, startDay, endYear, endMonth, endDay, language) {
+        var labels = [];
+        var currentDate = new Date(startYear, startMonth - 1, startDay); // 月份从0开始
+        var endDate = new Date(endYear, endMonth - 1, endDay);
+
+        while (currentDate <= endDate) {
+          var year = currentDate.getFullYear();
+          var month = currentDate.getMonth() + 1;
+          var day = currentDate.getDate();
+
+          if (language === 'zh') {
+            // 中文格式：10月1日, 10月2日, ...
+            labels.push(month + '月' + day + '日');
+          } else {
+            // 英文格式：Oct 1, Oct 2, ...
+            var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            var monthName = monthNames[month - 1];
+            labels.push(monthName + ' ' + day);
+          }
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        return labels;
+      }
+
+      // 辅助函数：获取中国省份数据
+      function getChinaProvinces(count) {
+        var allProvinces = [
+          '北京市', '天津市', '河北省', '山西省', '内蒙古自治区',
+          '辽宁省', '吉林省', '黑龙江省', '上海市', '江苏省',
+          '浙江省', '安徽省', '福建省', '江西省', '山东省',
+          '河南省', '湖北省', '湖南省', '广东省', '广西壮族自治区',
+          '海南省', '重庆市', '四川省', '贵州省', '云南省',
+          '西藏自治区', '陕西省', '甘肃省', '青海省', '宁夏回族自治区',
+          '新疆维吾尔自治区', '台湾省', '香港特别行政区', '澳门特别行政区'
+        ];
+
+        // 返回指定数量的省份
+        return allProvinces.slice(0, Math.min(count, allProvinces.length));
+      }
+
+      // 辅助函数：生成随机数据
+      function generateRandomData(length, min, max) {
+        var data = [];
+        for (var i = 0; i < length; i++) {
+          data.push(Math.floor(Math.random() * (max - min + 1)) + min);
+        }
+        return data;
+      }
+
+      // 辅助函数：生成场景1的配置（轴标签自适应布局测试）
+      function getOption1(layoutMode, language, dataCount) {
+        // 根据数据量选择合适的标签生成方式
+        var labels;
+        var titleText;
+        if (dataCount === 7) {
+          // 2025年10月1-7日（测试0度旋转）
+          labels = generateDateLabels(2025, 10, 1, 2025, 10, 7, language);
+          titleText = '坐标轴标签自适应布局测试（10月1-7日，7天，预期0°旋转或换行）';
+        } else if (dataCount === 31) {
+          // 2025年10月每日（测试45度旋转）
+          labels = generate2025OctoberDates(language);
+          titleText = '坐标轴标签自适应布局测试（10月每日，31天，预期45°旋转或换行）';
+        } else if (dataCount === 61) {
+          // 2025年10月、11月、12月每日（测试90度旋转）
+          labels = generateDateLabels(2025, 10, 1, 2025, 12, 31, language);
+          titleText = '坐标轴标签自适应布局测试（10-12月每日，92天，预期90°旋转或换行）';
+        } else {
+          // 默认情况
+          labels = generateDateLabels(2025, 10, 1, 2025, 10, dataCount, language);
+          titleText = '坐标轴标签自适应布局测试（' + dataCount + '个标签）';
+        }
+
+        var option = {
+          title: {
+            text: titleText,
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          xAxis: {
+            type: 'category',
+            data: labels,
+            axisLabel: {
+              layoutMode: layoutMode
+            }
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: '系列A',
+              type: 'bar',
+              data: generateRandomData(labels.length, 10, 100)
+            }
+          ]
+        };
+
+        return option;
+      }
+
+      // 辅助函数：生成场景2的配置（省份自适应布局测试）
+      function getOption2(layoutMode, dataCount) {
+        var provinces = getChinaProvinces(dataCount);
+        var titleText;
+
+        if (dataCount === 10) {
+          titleText = '省份标签自适应布局测试（前10个省份，预期0°旋转或换行）';
+        } else if (dataCount === 20) {
+          titleText = '省份标签自适应布局测试（前20个省份，预期45°旋转或换行）';
+        } else if (dataCount === 34) {
+          titleText = '省份标签自适应布局测试（全部34个省份，预期90°旋转或换行）';
+        } else {
+          titleText = '省份标签自适应布局测试（前' + dataCount + '个省份）';
+        }
+
+        var option = {
+          title: {
+            text: titleText,
+            left: 'center'
+          },
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            }
+          },
+          xAxis: {
+            type: 'category',
+            data: provinces,
+            axisLabel: {
+              layoutMode: layoutMode
+            }
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: 'GDP',
+              type: 'bar',
+              data: generateRandomData(provinces.length, 1000, 15000)
+            }
+          ]
+        };
+
+        return option;
+      }
+
+      var chart1Names = ['layoutMode', 'language', 'dataCount'];
+
+      // 坐标轴标签自适应布局测试
+      var chart1 = testHelper.create(echarts, 'axis-label-auto-rotate', {
+        title: '坐标轴标签自适应布局测试',
+        option: getOption1('rotate', 'zh', 7),
+        inputs: [
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['rotate', 'wrap'],
+            options: [
+              { text: '旋转模式', value: 'rotate' },
+              { text: '换行模式', value: 'wrap' }
+            ],
+            value: 'rotate',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '标签语言',
+            id: 'language',
+            values: ['zh', 'en'],
+            options: [
+              { text: '中文', value: 'zh' },
+              { text: 'English', value: 'en' }
+            ],
+            value: 'zh',
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '测试场景（数据量和预期布局效果）',
+            id: 'dataCount',
+            values: [7, 31, 61],
+            options: [
+              { text: '10月1-7日（7天，预期0°旋转或换行）', value: 7 },
+              { text: '10月每日（31天，预期45°旋转或换行）', value: 31 },
+              { text: '10-12月每日（92天，预期90°旋转或换行）', value: 61 }
+            ],
+            value: 7,
+            onchange: function () {
+              handleOptionChange(chart1, getOption1, chart1Names);
+            }
+          }
+        ]
+      });
+
+      var chart2Names = ['layoutMode', 'provinceCount'];
+
+      // 省份标签自适应布局测试
+      var chart2 = testHelper.create(echarts, 'axis-label-auto-rotate-provinces', {
+        title: '省份标签自适应布局测试',
+        option: getOption2('rotate', 10),
+        inputs: [
+          {
+            type: 'select',
+            text: '布局模式',
+            id: 'layoutMode',
+            values: ['rotate', 'wrap'],
+            options: [
+              { text: '旋转模式', value: 'rotate' },
+              { text: '换行模式', value: 'wrap' }
+            ],
+            value: 'rotate',
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          },
+          {
+            type: 'select',
+            text: '省份数量（测试自适应布局）',
+            id: 'provinceCount',
+            values: [10, 20, 34],
+            options: [
+              { text: '10个省份（预期0°旋转或换行）', value: 10 },
+              { text: '20个省份（预期45°旋转或换行）', value: 20 },
+              { text: '34个省份（预期90°旋转或换行）', value: 34 }
+            ],
+            value: 10,
+            onchange: function () {
+              handleOptionChange(chart2, getOption2, chart2Names);
+            }
+          }
+        ]
+      });
+
+    });
+  </script>
+</body>
+
+</html>

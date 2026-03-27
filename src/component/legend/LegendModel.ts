@@ -30,7 +30,10 @@ import {
     LayoutOrient,
     CommonTooltipOption,
     ItemStyleOption,
-    LineStyleOption
+    LineStyleOption,
+    ComponentOnCalendarOptionMixin,
+    ComponentOnMatrixOptionMixin,
+    PositionSizeOption
 } from '../../util/types';
 import { Dictionary } from 'zrender/src/core/types';
 import GlobalModel from '../../model/Global';
@@ -38,6 +41,11 @@ import { ItemStyleProps } from '../../model/mixin/itemStyle';
 import { LineStyleProps } from './../../model/mixin/lineStyle';
 import {PathStyleProps} from 'zrender/src/graphic/Path';
 import tokens from '../../visual/tokens';
+import {
+    AutoLayoutComponentModel,
+    AutoLayoutLegendOption,
+    preprocessLegendAutoLayoutOption
+} from '../../util/autoLayout';
 
 type LegendDefaultSelectorOptionsProps = {
     type: string;
@@ -158,8 +166,8 @@ export interface LegendSymbolStyleOption {
 }
 
 export interface LegendOption extends ComponentOption, LegendStyleOption,
-    BoxLayoutOptionMixin, BorderOptionMixin
-{
+    BoxLayoutOptionMixin, BorderOptionMixin,
+    ComponentOnCalendarOptionMixin, ComponentOnMatrixOptionMixin, AutoLayoutLegendOption {
 
     mainType?: 'legend'
 
@@ -240,7 +248,8 @@ export interface LegendOption extends ComponentOption, LegendStyleOption,
     triggerEvent?: boolean
 }
 
-class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentModel<Ops> {
+class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentModel<Ops>
+    implements AutoLayoutComponentModel {
     static type = 'legend.plain';
     type = LegendModel.type;
 
@@ -261,8 +270,11 @@ class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentMode
 
     private _data: Model<DataItem>[];
     private _availableNames: string[];
+    // 自动布局计算出的盒模型参数，存在则优先于用户设置参与布局
+    private _autoLayoutBoxParams?: BoxLayoutOptionMixin;
 
     init(option: Ops, parentModel: Model, ecModel: GlobalModel) {
+        preprocessLegendAutoLayoutOption(this.option);
         this.mergeDefaultAndTheme(option, ecModel);
 
         option.selected = option.selected || {};
@@ -270,6 +282,7 @@ class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentMode
     }
 
     mergeOption(option: Ops, ecModel: GlobalModel) {
+        preprocessLegendAutoLayoutOption(this.option);
         super.mergeOption(option, ecModel);
         this._updateSelector(option);
     }
@@ -445,6 +458,32 @@ class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentMode
             : {index: 0, name: 'horizontal'};
     }
 
+    /** @implements AutoLayoutComponentModel */
+    setAutoLayoutBoxParams(params: BoxLayoutOptionMixin) {
+        this._autoLayoutBoxParams = params;
+    }
+
+    getBoxLayoutParams(): {
+        left: PositionSizeOption;
+        top: PositionSizeOption;
+        right: PositionSizeOption;
+        bottom: PositionSizeOption;
+        width: PositionSizeOption;
+        height: PositionSizeOption;
+    } {
+        if (this._autoLayoutBoxParams) {
+            return this._autoLayoutBoxParams as {
+                left: PositionSizeOption;
+                top: PositionSizeOption;
+                right: PositionSizeOption;
+                bottom: PositionSizeOption;
+                width: PositionSizeOption;
+                height: PositionSizeOption;
+            };
+        }
+        return super.getBoxLayoutParams();
+    }
+
     static defaultOption: LegendOption = {
         // zlevel: 0,
         z: 4,
@@ -533,7 +572,15 @@ class LegendModel<Ops extends LegendOption = LegendOption> extends ComponentMode
             show: false
         },
 
-        triggerEvent: false
+        triggerEvent: false,
+
+        // 自动布局默认配置
+        autoLayout: {
+            enable: false,
+            position: 'bottom',
+            align: 'center',
+            layoutMode: 'multiLine'
+        }
     };
 }
 

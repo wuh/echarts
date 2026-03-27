@@ -1,5 +1,5 @@
 {
-  "name": "echarts",
+  "name": "succ-echarts",
   "version": "6.0.0",
   "description": "Apache ECharts is a powerful, interactive charting and data visualization library for browser",
   "license": "Apache-2.0",
@@ -16,16 +16,17 @@
   ],
   "main": "dist/echarts.js",
   "module": "index.js",
+  "unpkg": "dist/echarts.min.js",
   "jsdelivr": "dist/echarts.min.js",
   "types": "index.d.ts",
   "homepage": "https://echarts.apache.org",
   "bugs": {
-    "url": "https://github.com/apache/echarts/issues",
-    "email": "dev@echarts.apache.org"
+    "url": "https://github.com/wuh/echarts/issues",
+    "email": "wuh@succsoft.com"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/apache/echarts.git"
+    "url": "git+https://github.com/wuh/echarts.git"
   },
   "sideEffects": [
     "index.js",
@@ -159,6 +160,7 @@
     "./lib/chart/bar": "./lib/chart/bar.js",
     "./lib/chart/boxplot": "./lib/chart/boxplot.js",
     "./lib/chart/candlestick": "./lib/chart/candlestick.js",
+    "./lib/chart/chord": "./lib/chart/chord.js",
     "./lib/chart/custom": "./lib/chart/custom.js",
     "./lib/chart/effectScatter": "./lib/chart/effectScatter.js",
     "./lib/chart/funnel": "./lib/chart/funnel.js",

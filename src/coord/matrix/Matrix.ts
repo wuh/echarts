@@ -17,13 +17,14 @@
 * under the License.
 */
 
-import { RectLike } from 'zrender/src/core/BoundingRect';
-import type { CoordinateSystemDataLayout, NullUndefined, OrdinalNumber } from '../../util/types';
+import BoundingRect, { RectLike } from 'zrender/src/core/BoundingRect';
+import type { CoordinateSystemDataLayout, NullUndefined, OrdinalNumber, ZRRectLike } from '../../util/types';
 import {
     CoordinateSystem, CoordinateSystemMaster
 } from '../CoordinateSystem';
 import GlobalModel from '../../model/Global';
 import ExtensionAPI from '../../core/ExtensionAPI';
+import SeriesModel from '../../model/Series';
 import MatrixModel, {
     MatrixCoordRangeOption,
     MatrixDimensionCellOption, MatrixDimensionLevelOption, MatrixDimensionModel
@@ -32,7 +33,7 @@ import { LayoutRect, getLayoutRect } from '../../util/layout';
 import { ListIterator, ParsedModelFinder, ParsedModelFinderKnown } from '../../util/model';
 import { eqNaN, isArray, retrieve2 } from 'zrender/src/core/util';
 import Point from 'zrender/src/core/Point';
-import { WH, XY } from '../../util/graphic';
+import { WH, XY, expandOrShrinkRect } from '../../util/graphic';
 import Model from '../../model/Model';
 import type {
     MatrixCellLayoutInfo,
@@ -50,9 +51,20 @@ import {
 import type { MatrixBodyCorner, MatrixBodyOrCornerKind } from './MatrixBodyCorner';
 import { error } from '../../util/log';
 import { injectCoordSysByOption, simpleCoordSysInjectionProvider } from '../../core/CoordinateSystem';
+import {
+    LegendAvoidableCoordinateSystem,
+    LayoutLegendContext,
+    fillLegendGroupSpaceToMargin,
+    collectCoordLabelSeries,
+    calculateOuterBoundingRectWithLabels,
+    calculateSeriesLabelBoundingRects,
+    calculateSeriesLabelOverflowMargin,
+    isMarginAllZero,
+    calculateSymbolRect,
+} from '../../util/autoLayout';
 
 
-class Matrix implements CoordinateSystem, CoordinateSystemMaster {
+class Matrix implements CoordinateSystem, CoordinateSystemMaster, LegendAvoidableCoordinateSystem {
 
     static readonly dimensions = ['x', 'y', 'value'];
     /**
@@ -80,6 +92,10 @@ class Matrix implements CoordinateSystem, CoordinateSystemMaster {
     private _dims: MatrixDimPair;
 
     private _rect: LayoutRect;
+    private _ecModel: GlobalModel;
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    autoLayoutContext: LayoutLegendContext | undefined;
 
     static create(ecModel: GlobalModel, api: ExtensionAPI) {
         const matrixList: Matrix[] = [];
@@ -101,11 +117,16 @@ class Matrix implements CoordinateSystem, CoordinateSystemMaster {
             });
         });
 
+        // 对所有 matrix 坐标系应用自动布局
+        matrixList.forEach(matrix => {
+            matrix.applyAutoLayout(ecModel, api);
+        });
         return matrixList;
     }
 
     constructor(matrixModel: MatrixModel, ecModel: GlobalModel, api: ExtensionAPI) {
         this._model = matrixModel;
+        this._ecModel = ecModel;
         const models = this._dimModels = {
             x: matrixModel.getDimensionModel('x'),
             y: matrixModel.getDimensionModel('y'),
@@ -123,13 +144,21 @@ class Matrix implements CoordinateSystem, CoordinateSystemMaster {
     }
 
     private _resize(matrixModel: MatrixModel, api: ExtensionAPI) {
-        const dims = this._dims;
-        const dimModels = this._dimModels;
-
         const rect = this._rect = getLayoutRect(matrixModel.getBoxLayoutParams(), {
             width: api.getWidth(),
             height: api.getHeight(),
         });
+
+        this._relayoutCells(rect);
+    }
+
+    /**
+     * Re-layout cells based on current rect
+     * This is used after rect is adjusted by auto layout
+     */
+    private _relayoutCells(rect: LayoutRect): void {
+        const dims = this._dims;
+        const dimModels = this._dimModels;
 
         layOutUnitsOnDimension(dimModels, dims, rect, 0);
         layOutUnitsOnDimension(dimModels, dims, rect, 1);
@@ -315,6 +344,178 @@ class Matrix implements CoordinateSystem, CoordinateSystemMaster {
         return this._rect.contain(point[0], point[1]);
     }
 
+    /** @implements LegendAvoidableCoordinateSystem */
+    getOuterBoundingRect(): BoundingRect | null {
+        return this.getRect();
+    }
+
+    /** @implements LegendAvoidableCoordinateSystem */
+    applyAutoLayout(ecModel: GlobalModel, api: ExtensionAPI): void {
+        let finalBoundingRect: ZRRectLike;
+
+        // 步骤1：处理图例自动布局避让
+        // 注意：图例避让必须在标签溢出处理之前，因为图例位置会影响后续的标签边界计算
+        if (this.autoLayoutContext != null) {
+            if (this.autoLayoutContext.needLayout === true) {
+                // 计算包含矩阵标签和系列标签的合并边界矩形，用于图例位置计算
+                finalBoundingRect = this._calculateLabelBoundingRect(api, this.getRect());
+                // 根据图例分组计算所需空间，并累积到 autoLayoutContext.margin
+                fillLegendGroupSpaceToMargin(
+                    this.autoLayoutContext.group,
+                    api,
+                    finalBoundingRect,
+                    null,
+                    this.autoLayoutContext
+                );
+            }
+
+            // 应用图例避让所需的 margin，压缩矩阵区域为图例腾出空间
+            if (this.autoLayoutContext.margin != null) {
+                const contextMargin = this.autoLayoutContext.margin;
+                const rect = this.getRect();
+
+                if (rect) {
+                    expandOrShrinkRect(rect, contextMargin, true, true);
+                    finalBoundingRect && expandOrShrinkRect(finalBoundingRect, contextMargin, true, true);
+                    // 矩阵区域压缩后，需要重新计算所有单元格的位置
+                    this._relayoutCells(rect);
+                }
+            }
+        }
+
+        // 步骤2：处理系列标签溢出画布的自适应调整
+        // 在完成图例避让后，检查系列标签是否超出画布边界，必要时扩展矩阵区域
+        if (this._model.get('adaptiveLayout')) {
+            const labelRefContainer = {
+                x: 0,
+                y: 0,
+                width: api.getWidth(),
+                height: api.getHeight()
+            } as ZRRectLike;
+
+            const seriesLabelOverflowMargin = this._calculateSeriesLabelOverflowMargin(labelRefContainer, api);
+            if (seriesLabelOverflowMargin) {
+                const rect = this.getRect();
+                // 扩展矩阵区域以容纳溢出的标签
+                expandOrShrinkRect(rect, seriesLabelOverflowMargin, true, true);
+                finalBoundingRect && expandOrShrinkRect(finalBoundingRect, seriesLabelOverflowMargin, true, true);
+                this._relayoutCells(rect);
+                // 区域扩展后，需要重新计算最终边界矩形（因为标签位置可能已改变）
+                if (finalBoundingRect) {
+                    finalBoundingRect = this._calculateLabelBoundingRect(api, rect);
+                }
+            }
+        }
+
+        // 步骤3：将最终边界矩形写入上下文，供图例对齐和后续布局使用
+        if (this.autoLayoutContext?.needLayout === true) {
+            this.autoLayoutContext.finalBoundingRect = finalBoundingRect;
+        }
+    }
+
+    /**
+     * 计算矩阵坐标系中所有系列标签的边界矩形。
+     *
+     * 用于标签溢出检测和图例避让计算。
+     */
+    private _calculateSeriesLabelBoundingRects(seriesList: SeriesModel[], api: ExtensionAPI): Array<{
+        rect: BoundingRect;
+        textAlign: string;
+    }> {
+        const matrixCoord = this;
+        return calculateSeriesLabelBoundingRects(
+            seriesList,
+            api,
+            (seriesModel, data) => {
+                const items: Array<{
+                    dataIndex: number;
+                    point: number[];
+                    symbolRect: BoundingRect;
+                    labelText: string;
+                }> = [];
+
+                data.each((idx: number) => {
+                    const dataValue = data.getValues(['x', 'y'], idx);
+                    const point = matrixCoord.dataToPoint(dataValue);
+                    if (dataValue == null || !point || point.length < 2) {
+                        return;
+                    }
+
+                    const symbolRect = calculateSymbolRect(seriesModel, data, idx, point, api);
+                    if (!symbolRect) {
+                        return;
+                    }
+
+                    const labelText = seriesModel.getFormattedLabel(idx, 'normal');
+                    if (labelText == null || labelText === '') {
+                        return;
+                    }
+
+                    items.push({
+                        dataIndex: idx,
+                        point: point,
+                        symbolRect: symbolRect,
+                        labelText: labelText
+                    });
+                });
+
+                return items;
+            }
+        );
+    }
+
+    /**
+     * 计算系列标签溢出参考容器所需的边距。
+     * 用于自适应布局：当标签超出画布时，返回需要扩展的边距数组 [top, right, bottom, left]。
+     * 如果标签未溢出或无需扩展，返回 null。
+     */
+    private _calculateSeriesLabelOverflowMargin(
+        refContainer: RectLike,
+        api: ExtensionAPI
+    ): number[] | null {
+        const seriesList = collectCoordLabelSeries(this._ecModel, this);
+        if (seriesList.length === 0) {
+            return null;
+        }
+
+        const seriesLabelBoundingRects = this._calculateSeriesLabelBoundingRects(seriesList, api);
+        const seriesLabelOverflowMargin = calculateSeriesLabelOverflowMargin(
+            seriesLabelBoundingRects,
+            refContainer
+        );
+
+        return isMarginAllZero(seriesLabelOverflowMargin) ? null : seriesLabelOverflowMargin;
+    }
+
+    /**
+     * 计算包含矩阵标签和系列标签的合并边界矩形。
+     * 用于图例自动布局避让：图例需要知道矩阵区域加上所有标签后的实际占用空间。
+     *
+     * @param api ExtensionAPI 实例
+     * @param refContainer 参考容器矩形（当前未使用，保留用于未来扩展）
+     * @returns 合并后的边界矩形，包含矩阵标签和系列标签
+     */
+    private _calculateLabelBoundingRect(
+        api: ExtensionAPI,
+        refContainer: RectLike
+    ): RectLike {
+        const matrixRectWithLabels = this._rect;
+        if (!matrixRectWithLabels) {
+            return this.getRect();
+        }
+
+        const seriesList = collectCoordLabelSeries(this._ecModel, this);
+        const seriesLabelBoundingRects = this._calculateSeriesLabelBoundingRects(seriesList, api);
+        if (seriesLabelBoundingRects.length > 0) {
+            // 合并矩阵标签区域和系列标签区域，得到完整的占用空间
+            return calculateOuterBoundingRectWithLabels(
+                matrixRectWithLabels,
+                seriesLabelBoundingRects
+            );
+        }
+
+        return matrixRectWithLabels;
+    }
 }
 
 const _dtpOutDataToLayout = {rect: createNaNRectLike()};

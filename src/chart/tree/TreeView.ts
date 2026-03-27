@@ -36,7 +36,14 @@ import { TreeNode } from '../../data/Tree';
 import SeriesData from '../../data/SeriesData';
 import { setStatesStylesFromModel, setStatesFlag, setDefaultStateProxy, HOVER_STATE_BLUR } from '../../util/states';
 import { AnimationOption, ECElement, NullUndefined } from '../../util/types';
+import {
+    LegendAvoidableSeriesView,
+    LayoutLegendContext
+} from '../../util/autoLayout';
+import { BoundingRect } from 'zrender';
 import tokens from '../../visual/tokens';
+import { commonLayout } from './treeLayout';
+import { createBoxLayoutReference, getLayoutRect } from '../../util/layout';
 
 type TreeSymbol = SymbolClz & {
     __edge: graphic.BezierCurve | TreePath
@@ -124,7 +131,7 @@ class TreePath extends Path<TreeEdgePathProps> {
     }
 }
 
-class TreeView extends ChartView {
+class TreeView extends ChartView implements LegendAvoidableSeriesView {
 
     static readonly type = 'tree';
     readonly type = TreeView.type;
@@ -139,6 +146,8 @@ class TreeView extends ChartView {
     private _nodeScaleRatio: number;
     private _min: number[];
     private _max: number[];
+    /** @implements LegendAvoidableSeriesView */
+    autoLayoutContext: LayoutLegendContext | undefined;
 
     init(ecModel: GlobalModel, api: ExtensionAPI) {
         this._controller = new RoamController(api.getZr());
@@ -155,11 +164,17 @@ class TreeView extends ChartView {
         ecModel: GlobalModel,
         api: ExtensionAPI
     ) {
+        const group = this._mainGroup;
+        const autoLayoutContext = this.autoLayoutContext;
+        const margin = autoLayoutContext?.margin;
+        if (margin != null) {
+            commonLayout(seriesModel, api, margin);
+            // 重新布局后需要清空之前绘制的节点和边，否则会将之前绘制的节点和边绘制出来
+            group.removeAll();
+        }
         const data = seriesModel.getData();
 
         const layoutInfo = seriesModel.layoutInfo;
-
-        const group = this._mainGroup;
 
         const layout = seriesModel.get('layout');
 
@@ -330,6 +345,16 @@ class TreeView extends ChartView {
         this._data = null;
     }
 
+    /** @implements LegendAvoidableSeriesView */
+    getOuterBoundingRect(
+        seriesModel: TreeSeriesModel,
+        ecModel: GlobalModel,
+        api: ExtensionAPI,
+        payload: any
+    ): BoundingRect {
+        const refContainer = createBoxLayoutReference(seriesModel, api).refContainer;
+        return getLayoutRect(seriesModel.getBoxLayoutParams(), refContainer);
+    }
 }
 
 function symbolNeedsDraw(data: SeriesData, dataIndex: number) {
